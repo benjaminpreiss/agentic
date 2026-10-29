@@ -27,7 +27,7 @@ echo 'Current network:'; ip -brief address show "$iface"; ip route show default
 REMOTE
 command -v nix >/dev/null || { echo 'Nix missing on local machine' >&2; exit 1; }
 # Pin dependencies in the private deployment directory before evaluation.
-[[ -f "$DEPLOY/flake.lock" ]] || nix --extra-experimental-features 'nix-command flakes' flake lock --flake "path:$DEPLOY"
+[[ -f "$DEPLOY/flake.lock" ]] || nix --extra-experimental-features 'nix-command flakes' flake lock "path:$DEPLOY"
 # nix eval works before facter.json has been generated
 nix --extra-experimental-features 'nix-command flakes' eval --raw "path:$DEPLOY#nixosConfigurations.agentic.config.networking.hostName"
 echo
