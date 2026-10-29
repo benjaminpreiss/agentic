@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+echo "nnpi bootstrap revision: 2026-10-29-nono-profile-check-fix"
+
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
   echo 'This bootstrap supports only Ubuntu 24.04 LTS.' >&2
@@ -37,6 +39,8 @@ fi
 export AGENT_USER SSH_SOURCE_USER AUTO_REBOOT REBOOT_TIME ENABLE_UFW DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l
 "${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get update
 "${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get install -y ansible-core sudo ca-certificates curl zsh procps
+# Prepare shared status directory before Ansible writes status files.
+"${PRIV[@]}" install -d -o root -g root -m 0755 /var/lib/agentic
 
 playbook="$(mktemp --suffix=.yml)"
 trap 'rm -f "$playbook"' EXIT
@@ -257,7 +261,7 @@ cat > "$playbook" <<'YAML'
             print '  nnpi                 Start Pi inside nono sandbox (Herdr-aware)'
             print '  nnpi -p "prompt"     Run a prompt non-interactively'
             print '  pi                   Start Pi directly (NOT sandboxed)'
-            print '  nono policy show pi-herdr  Inspect sandbox policy'
+            print '  nono run --profile pi-herdr --dry-run -- /usr/bin/true  Check sandbox profile'
             print '  herdr --help         Herdr CLI help'
             print '  git status           Inspect the current repository'
             print '  Tab                  Complete files and commands'
@@ -804,6 +808,19 @@ cat > "$playbook" <<'YAML'
         group: root
         mode: '0755'
 
+    - name: Verify host security status directory exists
+      become_user: root
+      ansible.builtin.stat:
+        path: /var/lib/agentic
+      register: agentic_status_dir
+
+    - name: Assert host security status directory exists
+      become_user: root
+      ansible.builtin.assert:
+        that:
+          - agentic_status_dir.stat.isdir | default(false)
+        fail_msg: "Missing /var/lib/agentic: check bootstrap permissions and earlier directory task"
+
     - name: Write readable host security status for agent login screen
       become_user: root
       ansible.builtin.copy:
@@ -911,7 +928,7 @@ cat > "$playbook" <<'YAML'
         command -v nono
         command -v herdr
         test -x "$HOME/.local/bin/nnpi"
-        nono policy show pi-herdr >/dev/null
+        nono run --profile pi-herdr --dry-run -- /usr/bin/true >/dev/null
         herdr --version
         pi --version
       args: {executable: /bin/bash}
