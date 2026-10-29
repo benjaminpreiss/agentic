@@ -3,7 +3,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY="$ROOT/.deployment"
 [[ "${1:-}" == --install ]] || { echo "Usage: bash scripts/deploy.sh --install" >&2; exit 2; }
-[[ -f "$DEPLOY/generated/machine.nix" ]] || { echo 'Run python3 scripts/prepare.py first.' >&2; exit 1; }
+[[ -f "$DEPLOY/generated/machine.nix" ]] || { echo 'Run bash scripts/prepare.sh first.' >&2; exit 1; }
 command -v nix >/dev/null || { echo 'Nix required locally. See https://nixos.org/download/' >&2; exit 1; }
 "$ROOT/scripts/preflight.sh"
 cd "$DEPLOY"
