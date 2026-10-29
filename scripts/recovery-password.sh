@@ -13,7 +13,7 @@ mkdir -p "$(dirname "$DEST")"
 # Redirect output only, never save or log the plaintext password.
 TMP="$DEST.partial"
 trap 'rm -f "$TMP"' EXIT
-nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#whois -c mkpasswd -m sha-512 < /dev/tty > "$TMP"
+nix --extra-experimental-features 'nix-command flakes' shell nixpkgs#mkpasswd --command bash -c 'command -v mkpasswd >/dev/null || { echo "mkpasswd is missing from the Nix environment" >&2; exit 1; }; exec mkpasswd -m sha-512' < /dev/tty > "$TMP"
 [[ "$(wc -l < "$TMP" | tr -d ' ')" == 1 ]] || { echo 'Invalid hash output' >&2; exit 1; }
 grep -q '^\$6\$' "$TMP" || { echo 'Expected a SHA-512 crypt hash' >&2; exit 1; }
 chmod 0600 "$TMP"
