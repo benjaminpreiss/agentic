@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "nnpi bootstrap revision: 2026-10-29-minimal-inherited-nono-profile"
+echo "nnpi bootstrap revision: 2026-10-29-pi-earendil-migration-jiti-fix"
 
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
@@ -378,13 +378,28 @@ cat > "$playbook" <<'YAML'
         - "{{ local_bin }}"
         - "{{ agent_dir }}"
 
-    - name: Install Pi harness globally
+    - name: Remove deprecated Pi npm package when installed
       become_user: root
-      ansible.builtin.command: npm install --global @mariozechner/pi-coding-agent
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if npm list --global --depth=0 @mariozechner/pi-coding-agent --parseable 2>/dev/null | grep -q '/@mariozechner/pi-coding-agent$'; then
+          npm uninstall --global @mariozechner/pi-coding-agent
+          echo 'Removed deprecated Pi npm package'
+        fi
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: /usr/local/bin:/usr/bin:/bin
+      register: pi_legacy_remove
+      changed_when: "'Removed deprecated Pi npm package' in pi_legacy_remove.stdout"
+
+    - name: Install current Pi harness globally
+      become_user: root
+      ansible.builtin.command: npm install --global --ignore-scripts @earendil-works/pi-coding-agent@latest
       environment:
         PATH: /usr/local/bin:/usr/bin:/bin
       register: pi_install
-      changed_when: "'added ' in pi_install.stdout or 'changed ' in pi_install.stdout"
+      changed_when: "'added ' in pi_install.stdout or 'changed ' in pi_install.stdout or 'removed ' in pi_install.stdout"
 
     - name: Install all Matt Pocock skills globally for Pi as agentic
       ansible.builtin.git:
@@ -509,6 +524,10 @@ cat > "$playbook" <<'YAML'
           #!/usr/bin/env bash
           set -euo pipefail
           export HERDR_AGENT=pi
+          # Pi loads TypeScript extensions through jiti. Its disk cache falls
+          # back to /tmp/jiti, which our least-privilege sandbox denies.
+          # Disable the filesystem cache instead of granting access to /tmp.
+          export JITI_FS_CACHE=false
           # Restrict writable project access to ~/work; use the current project
           # if it is already inside that directory.
           work_root="$(realpath -e "$HOME/work")"
@@ -620,7 +639,12 @@ cat > "$playbook" <<'YAML'
           as_agent() {
             runuser -u "$AGENT_USER" -- env HOME="$AGENT_HOME" PATH="$AGENT_HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" "$@"
           }
-          update_pi() { npm install -g @mariozechner/pi-coding-agent@latest; }
+          update_pi() {
+            if npm list -g --depth=0 @mariozechner/pi-coding-agent --parseable 2>/dev/null | grep -q '/@mariozechner/pi-coding-agent$'; then
+              npm uninstall -g @mariozechner/pi-coding-agent || return 1
+            fi
+            npm install -g --ignore-scripts @earendil-works/pi-coding-agent@latest
+          }
           update_herdr() { as_agent herdr update; }
           update_nono() {
             local installer
