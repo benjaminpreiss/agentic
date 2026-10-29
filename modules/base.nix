@@ -17,12 +17,13 @@ let cfg = config.agenticMachine; in {
     networking.useNetworkd = true;
     systemd.network.enable = true;
     networking.useDHCP = false;
+    assertions = [{ assertion = cfg.networkInterface != ""; message = "A confirmed network interface is required"; }];
     systemd.network.networks."10-agentic" = {
-      matchConfig.Name = if cfg.networkInterface == "" then "en* eth* ens*" else cfg.networkInterface;
-      networkConfig.DHCP = if cfg.networkMode == "dhcp" then "yes" else "no";
+      matchConfig.Name = cfg.networkInterface;
       addresses = lib.optionals (cfg.networkMode == "static") [ { Address = cfg.staticIPv4; } ];
       routes = lib.optionals (cfg.networkMode == "static") [ { Gateway = cfg.gatewayIPv4; } ];
-      networkConfig.DNS = lib.optionals (cfg.networkMode == "static") cfg.dnsServers;
+      networkConfig.DHCP = if cfg.networkMode == "dhcp" then "yes" else "no";
+      dns = lib.optionals (cfg.networkMode == "static") cfg.dnsServers;
     };
     time.timeZone = "UTC";
     users.mutableUsers = false;

@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DEPLOY="$ROOT/.deployment"
-[[ "${1:-}" == --install ]] || { echo "Usage: bash scripts/deploy.sh --install" >&2; exit 2; }
-[[ -f "$DEPLOY/generated/machine.nix" ]] || { echo 'Run bash scripts/prepare.sh first.' >&2; exit 1; }
-command -v nix >/dev/null || { echo 'Nix required locally. See https://nixos.org/download/' >&2; exit 1; }
+[[ "${1:-}" == --install && $# -eq 1 ]] || { echo 'Usage: bash scripts/deploy.sh --install' >&2; exit 2; }
 "$ROOT/scripts/preflight.sh"
-cd "$DEPLOY"
-if [[ ! -f flake.lock ]]; then nix --extra-experimental-features 'nix-command flakes' flake lock --flake "path:$DEPLOY"; fi
-nix --extra-experimental-features 'nix-command flakes' eval --raw "path:$DEPLOY#nixosConfigurations.agentic.config.networking.hostName"
+target="$(cat "$DEPLOY/target.txt")"; disk="$(cat "$DEPLOY/selected-disk.txt")"
 echo
-printf 'DISK ERASE CONFIRMATION: type ERASE-AND-INSTALL-NIXOS: '
-IFS= read -r answer </dev/tty
-[[ "$answer" == ERASE-AND-INSTALL-NIXOS ]] || { echo 'Cancelled'; exit 1; }
-target="$(<"$DEPLOY/target.txt")"
+echo "DANGER: nixos-anywhere WILL ERASE $disk on $target."
+echo 'Existing Ubuntu, user data and on-disk backups will be destroyed.'
+printf 'Type ERASE-AND-INSTALL-NIXOS to continue: ' > /dev/tty
+IFS= read -r confirmation < /dev/tty
+[[ "$confirmation" == ERASE-AND-INSTALL-NIXOS ]] || { echo 'Cancelled'; exit 1; }
+cd "$DEPLOY"
+# The generated facter report is saved locally and consumed on subsequent builds.
+# This reports hardware; it does not replace explicit networking/disk choices.
 nix --extra-experimental-features 'nix-command flakes' run github:nix-community/nixos-anywhere -- \
-  --flake "path:$DEPLOY#agentic" --target-host "$target"
+  --flake "path:$DEPLOY#agentic" \
+  --generate-hardware-config nixos-facter "$DEPLOY/generated/facter.json" \
+  --target-host "$target"
+echo 'Installation command completed. Verify SSH access and the generated hardware report.'
