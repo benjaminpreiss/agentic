@@ -36,6 +36,8 @@ printf 'DNS=%s\n' "$(resolvectl dns 2>/dev/null | head -1 || true)"
 iface="$(ip -4 route show default | awk 'NR==1 {for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1);exit}}')"
 printf 'IFACE=%s\n' "$iface"
 if [[ -n "$iface" ]]; then
+  mac="$(cat "/sys/class/net/$iface/address")"
+  printf 'MAC=%s\n' "$mac"
   ip -4 -o addr show dev "$iface" | awk '$3=="inet" {print "IPV4=" $4; exit}'
   networkctl status "$iface" --no-pager 2>/dev/null | grep -E 'DHCP4 Client ID|DHCP4 Address|DHCP4 via|Address:.*\(DHCP4\)' | head -1 | sed 's/^/DHCP_EVIDENCE=/' || true
 fi
@@ -44,7 +46,7 @@ REMOTE
 readvalue() { sed -n "s/^$1=//p" "$DISC" | head -1; }
 ARCH="$(readvalue ARCH)"; [[ "$ARCH" == x86_64 ]] || fail "Unsupported target architecture: $ARCH (flake currently targets x86_64-linux)"
 [[ "$(readvalue PRIV)" == ok ]] || fail 'Target requires root SSH or passwordless sudo; do not deploy yet'
-BOOT="$(readvalue BOOT)"; HOST="$(readvalue HOST)"; IFACE="$(readvalue IFACE)"
+BOOT="$(readvalue BOOT)"; HOST="$(readvalue HOST)"; IFACE="$(readvalue IFACE)"; MAC="$(readvalue MAC)"
 ROUTE="$(readvalue ROUTE4)"; IPV4="$(readvalue IPV4)"
 printf '\nRemote disks:\n'; sed -n '/^DISKS_BEGIN$/,/^DISKS_END$/p' "$DISC" | sed '1d;$d'
 ROOT_PARENT="$(readvalue ROOT_PARENT)"
@@ -63,6 +65,8 @@ ask 'Boot mode (confirm detected)' "$BOOT"; BOOT="$REPLY"
 [[ "$BOOT" == bios || "$BOOT" == uefi ]] || fail 'Invalid boot mode'
 ask 'Network interface (confirm detected)' "$IFACE"; IFACE="$REPLY"
 [[ "$IFACE" =~ ^[A-Za-z0-9_.:-]+$ ]] || fail 'Network interface is required'
+[[ "$MAC" =~ ^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$ ]] || fail 'Could not discover a valid MAC address'
+printf 'Default-route interface: %s; MAC: %s\n' "$IFACE" "$MAC"
 # DHCP is guessed only when positive evidence exists, not based on a private/public IP.
 if grep -q '^DHCP_EVIDENCE=' "$DISC"; then DEFAULT_NETWORK=dhcp; else DEFAULT_NETWORK=static; fi
 printf 'Default route: %s\n' "${ROUTE:-none}"
@@ -106,6 +110,7 @@ mkdir -p "$STAGE/generated"
   printf 'sshPort = %s;\n' "$PORT"
   printf 'networkMode = %s;\n' "$(nixquote "$NET")"
   printf 'networkInterface = %s;\n' "$(nixquote "$IFACE")"
+  printf 'networkMAC = %s;\n' "$(nixquote "$MAC")"
   printf 'staticIPv4 = %s;\n' "$(nixquote "$ADDR")"
   printf 'gatewayIPv4 = %s;\n' "$(nixquote "$GATEWAY")"
   printf 'dnsServers = [%s ];\n' "$DNS_LIST"
@@ -115,9 +120,10 @@ printf '%s\n' "$TARGET" > "$STAGE/target.txt"
 printf '%s\n' "$DISK" > "$STAGE/selected-disk.txt"
 printf '%s\n' "$BOOT" > "$STAGE/boot-mode.txt"
 printf '%s\n' "$IFACE" > "$STAGE/network-interface.txt"
+printf '%s\n' "$MAC" > "$STAGE/network-mac.txt"
 printf '%s\n' "$NET" > "$STAGE/network-mode.txt"
 printf '%s\n' "$ARCH" > "$STAGE/architecture.txt"
 mv "$STAGE" "$OUT"
 trap - EXIT
 rm -f "$DISC"
-printf '\nGenerated %s\nNext: bash scripts/preflight.sh\nThen: bash scripts/deploy.sh --install\nDISK WILL BE ERASED. Copy backups off server first.\n' "$OUT"
+printf '\nGenerated %s\nNext: bash scripts/recovery-password.sh, then bash scripts/preflight.sh\nThen: bash scripts/deploy.sh --install\nDISK WILL BE ERASED. Copy backups off server first.\n' "$OUT"

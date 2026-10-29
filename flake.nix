@@ -13,6 +13,8 @@
         ./modules/base.nix
         ./modules/disk.nix
         ./modules/agentic.nix
+        ./modules/recovery.nix
+        ./modules/firstboot.nix
         ./generated/machine.nix
         # nixos-anywhere generates this during installation. The path is
         # absent during the initial flake evaluation and added afterwards.

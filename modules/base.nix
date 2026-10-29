@@ -6,6 +6,7 @@ let cfg = config.agenticMachine; in {
     sshPort = lib.mkOption { type = lib.types.port; default = 22; };
     networkMode = lib.mkOption { type = lib.types.enum [ "dhcp" "static" ]; default = "dhcp"; };
     networkInterface = lib.mkOption { type = lib.types.str; default = ""; };
+    networkMAC = lib.mkOption { type = lib.types.str; default = ""; };
     staticIPv4 = lib.mkOption { type = lib.types.str; default = ""; };
     gatewayIPv4 = lib.mkOption { type = lib.types.str; default = ""; };
     dnsServers = lib.mkOption { type = lib.types.listOf lib.types.str; default = []; };
@@ -17,12 +18,12 @@ let cfg = config.agenticMachine; in {
     networking.useNetworkd = true;
     systemd.network.enable = true;
     networking.useDHCP = false;
-    assertions = [{ assertion = cfg.networkInterface != ""; message = "A confirmed network interface is required"; }];
+    assertions = [{ assertion = cfg.networkMAC != ""; message = "A confirmed network interface MAC address is required"; }];
     systemd.network.networks."10-agentic" = {
-      matchConfig.Name = cfg.networkInterface;
+      matchConfig.MACAddress = cfg.networkMAC;
       addresses = lib.optionals (cfg.networkMode == "static") [ { Address = cfg.staticIPv4; } ];
       routes = lib.optionals (cfg.networkMode == "static") [ { Gateway = cfg.gatewayIPv4; } ];
-      networkConfig.DHCP = if cfg.networkMode == "dhcp" then "yes" else "no";
+      networkConfig.DHCP = if cfg.networkMode == "dhcp" then "ipv4" else "no";
       dns = lib.optionals (cfg.networkMode == "static") cfg.dnsServers;
     };
     time.timeZone = "UTC";

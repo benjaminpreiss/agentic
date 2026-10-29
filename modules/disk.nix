@@ -40,7 +40,8 @@ in {
       })
       (lib.mkIf (cfg.bootMode == "bios") {
         grub.enable = true;
-        grub.device = cfg.disk;
+        grub.device = lib.mkForce "";
+        grub.devices = lib.mkForce [ cfg.disk ];
         grub.efiSupport = false;
       })
     ];

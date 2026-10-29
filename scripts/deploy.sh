@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 DEPLOY="$ROOT/.deployment"
 [[ "${1:-}" == --install && $# -eq 1 ]] || { echo 'Usage: bash scripts/deploy.sh --install' >&2; exit 2; }
-"$ROOT/scripts/preflight.sh"
+bash "$ROOT/scripts/preflight.sh"
 target="$(cat "$DEPLOY/target.txt")"; disk="$(cat "$DEPLOY/selected-disk.txt")"
 echo
 echo "DANGER: nixos-anywhere WILL ERASE $disk on $target."
@@ -17,5 +17,6 @@ cd "$DEPLOY"
 nix --extra-experimental-features 'nix-command flakes' run github:nix-community/nixos-anywhere -- \
   --flake "path:$DEPLOY#agentic" \
   --generate-hardware-config nixos-facter "$DEPLOY/generated/facter.json" \
+  --extra-files "$DEPLOY/extra-files" \
   --target-host "$target"
 echo 'Installation command completed. Verify SSH access and the generated hardware report.'
