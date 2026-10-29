@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "nnpi bootstrap revision: 2026-10-29-mattpocock-global-skills"
+echo "nnpi bootstrap revision: 2026-10-29-minimal-inherited-nono-profile"
 
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
@@ -466,14 +466,34 @@ cat > "$playbook" <<'YAML'
       ansible.builtin.command: "{{ nono_path.stdout | trim }} pull nolabs-ai/pi"
       changed_when: false
 
-    - name: Check local child profile
-      ansible.builtin.stat:
-        path: "{{ user_home }}/.config/nono/profiles/pi-herdr.json"
-      register: child_profile
+    - name: Install minimal Pi profile inheriting nono protections
+      ansible.builtin.copy:
+        dest: "{{ user_home }}/.config/nono/profiles/pi-herdr.json"
+        mode: '0600'
+        content: |
+          {
+            "extends": "nolabs-ai/pi",
+            "meta": {
+              "name": "pi-herdr",
+              "version": "1.0.1",
+              "description": "Pi with inherited nono protections and an Agentic workspace"
+            },
+            "workdir": { "access": "readwrite" },
+            "filesystem": {
+              "allow": ["$HOME/work"],
+              "read": ["$HOME/.pi/agent/skills"]
+            }
+          }
 
-    - name: Create local profile extending the nono Pi package
-      ansible.builtin.command: "{{ nono_path.stdout | trim }} profile init pi-herdr --extends nolabs-ai/pi"
-      when: not child_profile.stat.exists
+    # The upstream Pi profile supplies Pi runtime/session permissions. We
+    # deliberately do not bypass nono's built-in sensitive-path deny groups.
+    - name: Check minimal Pi sandbox profile with installed nono
+      ansible.builtin.shell: |
+        set -euo pipefail
+        "{{ local_bin }}/nono" run --profile pi-herdr --allow-cwd --dry-run -- /usr/bin/true >/dev/null
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Install Pi extension for reporting status to Herdr
       ansible.builtin.command: "{{ local_bin }}/herdr integration install pi"
@@ -489,7 +509,15 @@ cat > "$playbook" <<'YAML'
           #!/usr/bin/env bash
           set -euo pipefail
           export HERDR_AGENT=pi
-          exec "$(command -v nono)" run --profile pi-herdr -- "$(command -v pi)" "$@"
+          # Restrict writable project access to ~/work; use the current project
+          # if it is already inside that directory.
+          work_root="$(realpath -e "$HOME/work")"
+          current="$(realpath -e "$PWD")"
+          case "$current/" in
+            "$work_root/"*) ;;
+            *) cd -- "$work_root" ;;
+          esac
+          exec "$(command -v nono)" run --profile pi-herdr --allow-cwd -- "$(command -v pi)" "$@"
 
     - name: Add user's local bin to interactive shells' PATH
       ansible.builtin.blockinfile:
@@ -974,7 +1002,7 @@ cat > "$playbook" <<'YAML'
         command -v nono
         command -v herdr
         test -x "$HOME/.local/bin/nnpi"
-        nono run --profile pi-herdr --dry-run -- /usr/bin/true >/dev/null
+        nono run --profile pi-herdr --allow-cwd --dry-run -- /usr/bin/true >/dev/null
         herdr --version
         pi --version
         test "$(find "$HOME/.pi/agent/skills/mattpocock" -type f -name SKILL.md | wc -l)" -gt 0
