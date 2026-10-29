@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "nnpi bootstrap revision: 2026-10-29-pi-earendil-migration-jiti-fix"
+echo "nnpi bootstrap revision: 2026-10-29-shell-welcome-explicit-workdir"
 
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
@@ -219,13 +219,10 @@ cat > "$playbook" <<'YAML'
           [[ -r /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
           command -v starship >/dev/null && eval "$(starship init zsh)"
 
-          # Start interactive login sessions in the agent workspace.
-          if [[ -o interactive && -o login && -d "$HOME/work" ]]; then
-            cd "$HOME/work"
-          fi
-
-          # Welcome message for interactive login shells (never automated commands).
-          if [[ -o interactive && -o login && -z "${NNPI_NO_WELCOME:-}" ]]; then
+          # Show the welcome screen once for an interactive session, including
+          # non-login Zsh shells used by SSH/Herdr. Never change directories.
+          if [[ -o interactive && -z "${NNPI_NO_WELCOME:-}" && -z "${NNPI_WELCOME_SHOWN:-}" ]]; then
+            export NNPI_WELCOME_SHOWN=1
             print -P '%F{cyan}╭────────────────────────────────────────╮%f'
             print -P '%F{cyan}│           AGENTIC WORKSPACE            │%f'
             print -P '%F{cyan}╰────────────────────────────────────────╯%f'
@@ -239,6 +236,9 @@ cat > "$playbook" <<'YAML'
                 printf '  %-17s %s\n' "$tool" "$(command -v "$tool")"
               fi
             done
+            print ''
+            print 'Workspace: ~/work (Pi is sandboxed to this directory)'
+            print '  cd ~/work            Switch to the agent workspace'
             print ''
             print 'Maintenance status:'
             if (( $+commands[systemctl] )); then
@@ -528,13 +528,17 @@ cat > "$playbook" <<'YAML'
           # back to /tmp/jiti, which our least-privilege sandbox denies.
           # Disable the filesystem cache instead of granting access to /tmp.
           export JITI_FS_CACHE=false
-          # Restrict writable project access to ~/work; use the current project
-          # if it is already inside that directory.
+          # Stay in the caller's directory. Do not silently change directories
+          # or grant a different working tree to the sandbox.
           work_root="$(realpath -e "$HOME/work")"
           current="$(realpath -e "$PWD")"
           case "$current/" in
             "$work_root/"*) ;;
-            *) cd -- "$work_root" ;;
+            *)
+              printf 'nnpi: Pi can run only inside the sandboxed workspace: %s\n' "$work_root" >&2
+              printf 'Switch there with: cd ~/work\n' >&2
+              exit 2
+              ;;
           esac
           exec "$(command -v nono)" run --profile pi-herdr --allow-cwd -- "$(command -v pi)" "$@"
 
