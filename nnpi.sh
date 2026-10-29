@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "nnpi bootstrap revision: 2026-10-29-nono-profile-check-fix"
+echo "nnpi bootstrap revision: 2026-10-29-ghostty-terminal-compat-fix"
 
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
@@ -107,7 +107,7 @@ cat > "$playbook" <<'YAML'
     - name: Install prerequisite OS packages
       become_user: root
       ansible.builtin.apt:
-        name: [curl, ca-certificates, gnupg, git, procps, xz-utils, zsh, zsh-autosuggestions, zsh-syntax-highlighting, fonts-powerline]
+        name: [curl, ca-certificates, gnupg, git, procps, xz-utils, zsh, zsh-autosuggestions, zsh-syntax-highlighting, fonts-powerline, ncurses-bin]
         state: present
         update_cache: true
 
@@ -193,12 +193,19 @@ cat > "$playbook" <<'YAML'
         # This account is dedicated to agent sessions; its shell config is managed.
         content: |
           export PATH="$HOME/.local/bin:$PATH"
+          # Ubuntu 24.04 may lack Ghostty's xterm-ghostty terminfo on SSH hosts.
+          # Use a known, supported terminal description if it is unavailable.
+          # Do this BEFORE prompt, completion and ZLE plugins initialize.
+          if [[ "$TERM" == xterm-ghostty ]] && ! infocmp xterm-ghostty >/dev/null 2>&1; then
+            export TERM=xterm-256color
+            export NNPI_GHOSTTY_TERMINFO_FALLBACK=1
+          fi
           export ZSH="$HOME/.oh-my-zsh"
           ZSH_THEME=""
           plugins=(git sudo)
           source "$ZSH/oh-my-zsh.sh"
-          autoload -Uz compinit
-          compinit
+          # Oh My Zsh already runs compinit; initializing it twice can
+          # interfere with completion and prompt redraw hooks.
           zstyle ':completion:*' menu select
           zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
           [[ -r /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
@@ -210,6 +217,9 @@ cat > "$playbook" <<'YAML'
             print -P '%F{cyan}╭────────────────────────────────────────╮%f'
             print -P '%F{cyan}│           AGENTIC WORKSPACE            │%f'
             print -P '%F{cyan}╰────────────────────────────────────────╯%f'
+            if [[ -n "${NNPI_GHOSTTY_TERMINFO_FALLBACK:-}" ]]; then
+              print 'Terminal: Ghostty terminfo absent; using xterm-256color compatibility mode.'
+            fi
             print ''
             print 'Available tools:'
             for tool in nnpi pi nono herdr git node npm ansible-playbook; do
