@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY="$ROOT/.deployment"
-[[ -r "$DEPLOY/target.txt" && -r "$DEPLOY/selected-disk.txt" ]] || { echo 'Run python3 scripts/prepare.py first.' >&2; exit 1; }
+[[ -r "$DEPLOY/target.txt" && -r "$DEPLOY/selected-disk.txt" ]] || { echo 'Run bash scripts/prepare.sh first.' >&2; exit 1; }
 target="$(<"$DEPLOY/target.txt")"
 disk="$(<"$DEPLOY/selected-disk.txt")"
 echo "Target: $target"
