@@ -36,7 +36,7 @@ if [[ ! "$ENABLE_UFW" =~ ^(true|false)$ ]]; then
 fi
 export AGENT_USER SSH_SOURCE_USER AUTO_REBOOT REBOOT_TIME ENABLE_UFW DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l
 "${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get update
-"${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get install -y ansible-core sudo ca-certificates curl zsh
+"${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get install -y ansible-core sudo ca-certificates curl zsh procps
 
 playbook="$(mktemp --suffix=.yml)"
 trap 'rm -f "$playbook"' EXIT
@@ -92,7 +92,7 @@ cat > "$playbook" <<'YAML'
     user_home: "/home/{{ lookup('env', 'AGENT_USER') }}"
     local_bin: "{{ user_home }}/.local/bin"
     agent_dir: "{{ user_home }}/.pi/agent"
-    provision_path: "{{ local_bin }}:/usr/local/bin:/usr/bin:/bin"
+    provision_path: "{{ local_bin }}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   environment:
     HOME: "{{ user_home }}"
     PATH: "{{ provision_path }}"
@@ -103,7 +103,7 @@ cat > "$playbook" <<'YAML'
     - name: Install prerequisite OS packages
       become_user: root
       ansible.builtin.apt:
-        name: [curl, ca-certificates, gnupg, git, xz-utils, zsh, zsh-autosuggestions, zsh-syntax-highlighting, fonts-powerline]
+        name: [curl, ca-certificates, gnupg, git, procps, xz-utils, zsh, zsh-autosuggestions, zsh-syntax-highlighting, fonts-powerline]
         state: present
         update_cache: true
 
@@ -716,9 +716,25 @@ cat > "$playbook" <<'YAML'
           net.ipv6.conf.default.accept_redirects = 0
       register: agentic_sysctl_hardening
 
+    - name: Confirm sysctl is available before loading kernel hardening
+      become_user: root
+      ansible.builtin.stat:
+        path: /usr/sbin/sysctl
+      register: agentic_sysctl_binary
+
+    - name: Fail with actionable message if sysctl is missing
+      ansible.builtin.assert:
+        that: agentic_sysctl_binary.stat.exists
+        fail_msg: "Missing /usr/sbin/sysctl: install the Ubuntu procps package."
+      when: agentic_sysctl_hardening.changed
+
     - name: Load kernel hardening settings
       become_user: root
-      ansible.builtin.command: sysctl -p /etc/sysctl.d/90-agentic-hardening.conf
+      ansible.builtin.command:
+        argv:
+          - /usr/sbin/sysctl
+          - -p
+          - /etc/sysctl.d/90-agentic-hardening.conf
       when: agentic_sysctl_hardening.changed
 
     - name: Enable AppArmor (when supported by this host)
