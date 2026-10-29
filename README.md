@@ -89,15 +89,40 @@ The setup skill can help configure Matt Pocock's workflow for individual project
 
 ### Sandboxed Execution
 
-The `nnpi` launcher executes Pi inside nono using the `pi-herdr` profile and enables Herdr agent detection.
+The `nnpi` command runs Pi inside [nono](https://nono.sh) using a custom `pi-herdr` profile.
 
-Run a prompt directly:
+The profile inherits the official `nolabs-ai/pi` policy, including nono's built-in protection of sensitive files and credentials.
+
+**Filesystem access:**
+
+| Location | Access |
+|---|---|
+| `~/work` | Read/write |
+| `~/.pi/agent/skills` | Read-only grant |
+| Pi configuration and session storage | Inherited from `nolabs-ai/pi` |
+| Other files and directories | Governed by the inherited nono policy |
+
+The profile intentionally avoids maintaining a separate list of restricted credential directories. Instead, it relies on nono's upstream security protections.
+
+**Important:** Inherited permissions may grant broader access to Pi's configuration directories. The read-only skills grant does not override more permissive inherited rules.
+
+Start sandboxed Pi:
+
+```bash
+nnpi
+```
+
+Pass a prompt directly:
 
 ```bash
 nnpi -p "Analyze this repository"
 ```
 
-Arguments are forwarded to Pi. Running `pi` directly bypasses the nono sandbox.
+The launcher starts Pi in `~/work` by default and preserves the current directory when working inside a project under `~/work`.
+
+Running `pi` directly bypasses the sandbox. Use `nnpi` for sandboxed execution.
+
+The sandbox profile is provisioned non-interactively, although nono may still request approval for additional runtime permissions.
 
 ## Remote Access with Herdr
 
