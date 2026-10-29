@@ -6,7 +6,7 @@ A reusable NixOS base for dedicated AI coding servers, deployed **from your comp
 
 ## Requirements
 
-- Your computer: Nix with flakes support, Python 3, SSH client, and SSH private key.
+- Your computer: Nix with flakes support, Bash 3.2+, SSH client, and SSH private key.
 - Target: x86_64 Linux, supported kexec environment, reachable over SSH as **root or passwordless-sudo** user.
 - An out-of-band recovery console and verified OFF-SERVER backup.
 - Full target disk device, boot mode, network interface, and DHCP/static addressing known from the actual target.
@@ -17,7 +17,7 @@ A reusable NixOS base for dedicated AI coding servers, deployed **from your comp
 From the repository root on your computer:
 
 ```bash
-python3 scripts/prepare.py
+bash scripts/prepare.sh
 bash scripts/preflight.sh
 bash scripts/deploy.sh --install
 ```
@@ -56,7 +56,7 @@ A local backup on the install disk is **erased with the old OS**. Clone or archi
 - `modules/base.nix` — users, SSH, networking, hardening, shell
 - `modules/disk.nix` — destructive GPT disk layout, BIOS or UEFI
 - `modules/agentic.nix` — workspace, wrapper, status, backup timer
-- `scripts/prepare.py` — interactive local configuration generator
+- `scripts/prepare.sh` — interactive local configuration generator
 - `scripts/preflight.sh` — inspect the remote host before erasing it
 - `scripts/deploy.sh` — confirmed `nixos-anywhere` install
 - `docs/POSTINSTALL.md` — known gaps and next steps
