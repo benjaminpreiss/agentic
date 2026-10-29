@@ -34,9 +34,9 @@ ENABLE_UFW="${ENABLE_UFW:-true}"
 if [[ ! "$ENABLE_UFW" =~ ^(true|false)$ ]]; then
   echo 'ENABLE_UFW must be true or false.' >&2; exit 1
 fi
-export AGENT_USER SSH_SOURCE_USER AUTO_REBOOT REBOOT_TIME ENABLE_UFW DEBIAN_FRONTEND=noninteractive
-"${PRIV[@]}" apt-get update
-"${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y ansible-core sudo ca-certificates curl zsh
+export AGENT_USER SSH_SOURCE_USER AUTO_REBOOT REBOOT_TIME ENABLE_UFW DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l
+"${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get update
+"${PRIV[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l apt-get install -y ansible-core sudo ca-certificates curl zsh
 
 playbook="$(mktemp --suffix=.yml)"
 trap 'rm -f "$playbook"' EXIT
@@ -96,6 +96,9 @@ cat > "$playbook" <<'YAML'
   environment:
     HOME: "{{ user_home }}"
     PATH: "{{ provision_path }}"
+    DEBIAN_FRONTEND: noninteractive
+    NEEDRESTART_SUSPEND: "1"
+    NEEDRESTART_MODE: l
   tasks:
     - name: Install prerequisite OS packages
       become_user: root
@@ -293,22 +296,55 @@ cat > "$playbook" <<'YAML'
       changed_when: false
       failed_when: false
 
-    - name: Set up NodeSource Node.js 24 LTS repository
+    # NodeSource is configured directly: do not run setup_24.x, which invokes
+    # nested APT commands and can get stuck in interactive needrestart dialogs.
+    - name: Download NodeSource repository signing key
       become_user: root
-      ansible.builtin.shell: |
-        set -euo pipefail
-        curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-      args:
-        executable: /bin/bash
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+        dest: /usr/share/keyrings/nodesource-repo.asc
+        mode: '0644'
+        timeout: 30
       when: current_node.rc != 0 or (current_node.stdout | regex_replace('^v', '')).split('.')[0] | int < 24
 
-    - name: Install Node.js 24 LTS
+    - name: Configure NodeSource 24 APT source (without setup script)
+      become_user: root
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/nodesource.sources
+        mode: '0644'
+        content: |
+          Types: deb
+          URIs: https://deb.nodesource.com/node_24.x
+          Suites: nodistro
+          Components: main
+          Signed-By: /usr/share/keyrings/nodesource-repo.asc
+      when: current_node.rc != 0 or (current_node.stdout | regex_replace('^v', '')).split('.')[0] | int < 24
+
+    - name: Prefer NodeSource nodejs package over Ubuntu Node.js
+      become_user: root
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/agentic-nodejs
+        mode: '0644'
+        content: |
+          Package: nodejs
+          Pin: origin deb.nodesource.com
+          Pin-Priority: 600
+      when: current_node.rc != 0 or (current_node.stdout | regex_replace('^v', '')).split('.')[0] | int < 24
+
+    - name: Install Node.js 24 from configured repository
       become_user: root
       ansible.builtin.apt:
         name: nodejs
         state: latest
         update_cache: true
+        lock_timeout: 180
       when: current_node.rc != 0 or (current_node.stdout | regex_replace('^v', '')).split('.')[0] | int < 24
+
+    - name: Verify Node.js 24 is available
+      ansible.builtin.command: node --version
+      register: node_verified
+      changed_when: false
+      failed_when: node_verified.rc != 0 or ((node_verified.stdout | regex_replace('^v', '')).split('.')[0] | int) < 24
 
     - name: Create user-level binary and Pi configuration directories
       ansible.builtin.file:
@@ -440,6 +476,7 @@ cat > "$playbook" <<'YAML'
           #!/usr/bin/env bash
           set -euo pipefail
           umask 077
+          export DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l
           AGENT_USER="{{ lookup('env', 'AGENT_USER') }}"
           AGENT_HOME="/home/$AGENT_USER"
           STORE=/var/backups/agentic
@@ -490,6 +527,7 @@ cat > "$playbook" <<'YAML'
           #!/usr/bin/env bash
           set -uo pipefail
           export DEBIAN_FRONTEND=noninteractive
+          export DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 NEEDRESTART_MODE=l
           AGENT_USER="{{ lookup('env', 'AGENT_USER') }}"
           AGENT_HOME="/home/$AGENT_USER"
           failed=0
