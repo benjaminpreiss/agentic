@@ -762,9 +762,22 @@ cat > "$playbook" <<'YAML'
         fail_msg: 'Could not detect SSH listening ports; refusing firewall activation to prevent lockout.'
       when: lookup('env', 'ENABLE_UFW') == 'true'
 
+    - name: Verify UFW executable is installed before changing firewall rules
+      become_user: root
+      ansible.builtin.stat:
+        path: /usr/sbin/ufw
+      register: agentic_ufw_binary
+      when: lookup('env', 'ENABLE_UFW') == 'true'
+
+    - name: Stop safely if UFW is missing
+      ansible.builtin.assert:
+        that: agentic_ufw_binary.stat.exists
+        fail_msg: 'Missing /usr/sbin/ufw: install the Ubuntu ufw package before enabling the firewall.'
+      when: lookup('env', 'ENABLE_UFW') == 'true'
+
     - name: Allow SSH ports before firewall activation
       become_user: root
-      ansible.builtin.command: "ufw allow {{ item }}/tcp comment 'SSH - agentic bootstrap'"
+      ansible.builtin.command: "/usr/sbin/ufw allow {{ item }}/tcp comment 'SSH - agentic bootstrap'"
       loop: "{{ ssh_listen_ports.stdout_lines | default([]) | unique }}"
       register: ufw_ssh_rules
       changed_when: "'Rules updated' in ufw_ssh_rules.stdout or 'Rules updated' in ufw_ssh_rules.stderr"
@@ -774,9 +787,9 @@ cat > "$playbook" <<'YAML'
       become_user: root
       ansible.builtin.shell: |
         set -euo pipefail
-        ufw default deny incoming
-        ufw default allow outgoing
-        ufw --force enable
+        /usr/sbin/ufw default deny incoming
+        /usr/sbin/ufw default allow outgoing
+        /usr/sbin/ufw --force enable
       args: {executable: /bin/bash}
       register: ufw_enable_result
       changed_when: "'Firewall is active' in ufw_enable_result.stdout"
