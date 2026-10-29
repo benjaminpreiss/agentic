@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "nnpi bootstrap revision: 2026-10-29-nono-profile-check-fix-v2"
+echo "nnpi bootstrap revision: 2026-10-29-nono-profile-check-fix"
 
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
