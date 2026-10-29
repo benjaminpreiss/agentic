@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-echo "nnpi bootstrap revision: 2026-10-29-ghostty-terminal-compat-fix"
+echo "nnpi bootstrap revision: 2026-10-29-mattpocock-global-skills"
 
 # Ubuntu 24.04 LTS. Run as root or as a user with sudo rights.
 if [[ "$(. /etc/os-release; echo "${ID}:${VERSION_ID}")" != 'ubuntu:24.04' ]]; then
@@ -62,6 +62,13 @@ cat > "$playbook" <<'YAML'
         create_home: true
         shell: /usr/bin/zsh
         state: present
+    - name: Create agent work directory
+      ansible.builtin.file:
+        path: "{{ agent_home }}/work"
+        state: directory
+        owner: "{{ agent_user }}"
+        group: "{{ agent_user }}"
+        mode: '0750'
     - name: Check existing SSH authorized keys from invoking account
       ansible.builtin.stat:
         path: "{{ '/root' if ssh_source_user == 'root' else '/home/' + ssh_source_user }}/.ssh/authorized_keys"
@@ -212,6 +219,11 @@ cat > "$playbook" <<'YAML'
           [[ -r /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
           command -v starship >/dev/null && eval "$(starship init zsh)"
 
+          # Start interactive login sessions in the agent workspace.
+          if [[ -o interactive && -o login && -d "$HOME/work" ]]; then
+            cd "$HOME/work"
+          fi
+
           # Welcome message for interactive login shells (never automated commands).
           if [[ -o interactive && -o login && -z "${NNPI_NO_WELCOME:-}" ]]; then
             print -P '%F{cyan}╭────────────────────────────────────────╮%f'
@@ -270,10 +282,7 @@ cat > "$playbook" <<'YAML'
             print 'Quick commands:'
             print '  nnpi                 Start Pi inside nono sandbox (Herdr-aware)'
             print '  nnpi -p "prompt"     Run a prompt non-interactively'
-            print '  pi                   Start Pi directly (NOT sandboxed)'
-            print '  nono run --profile pi-herdr --dry-run -- /usr/bin/true  Check sandbox profile'
             print '  herdr --help         Herdr CLI help'
-            print '  git status           Inspect the current repository'
             print '  Tab                  Complete files and commands'
             print '  Ctrl+R               Search shell history'
             print ''
@@ -376,6 +385,29 @@ cat > "$playbook" <<'YAML'
         PATH: /usr/local/bin:/usr/bin:/bin
       register: pi_install
       changed_when: "'added ' in pi_install.stdout or 'changed ' in pi_install.stdout"
+
+    - name: Install all Matt Pocock skills globally for Pi as agentic
+      ansible.builtin.git:
+        repo: https://github.com/mattpocock/skills.git
+        dest: "{{ agent_dir }}/skills/mattpocock"
+        version: main
+        update: true
+        force: false
+        depth: 1
+
+    - name: Verify Matt Pocock skills are discoverable by Pi
+      ansible.builtin.shell: |
+        set -euo pipefail
+        skills_dir="{{ agent_dir }}/skills/mattpocock"
+        count="$(find "$skills_dir" -type f -name SKILL.md | wc -l)"
+        if [ "$count" -lt 1 ]; then
+          echo "No SKILL.md files found in $skills_dir" >&2
+          exit 1
+        fi
+        echo "Found $count Matt Pocock skills in Pi's global directory"
+      args: {executable: /bin/bash}
+      register: mattpocock_skill_check
+      changed_when: false
 
     - name: Check Herdr installation
       ansible.builtin.shell: command -v herdr
@@ -575,6 +607,9 @@ cat > "$playbook" <<'YAML'
             return "$status"
           }
           update_pi_pack() { as_agent nono pull nolabs-ai/pi; }
+          update_mattpocock_skills() {
+            as_agent git -C "$AGENT_HOME/.pi/agent/skills/mattpocock" pull --ff-only
+          }
           update_omz() {
             as_agent zsh "$AGENT_HOME/.oh-my-zsh/tools/upgrade.sh" -v minimal
           }
@@ -593,6 +628,7 @@ cat > "$playbook" <<'YAML'
           step 'Ubuntu APT metadata' apt-get update
           step 'Ubuntu unattended upgrades' unattended-upgrade -v
           step 'Pi' update_pi
+          step 'Matt Pocock skills' update_mattpocock_skills
           step 'Herdr' update_herdr
           step 'nono' update_nono
           step 'nono Pi pack' update_pi_pack
@@ -941,6 +977,7 @@ cat > "$playbook" <<'YAML'
         nono run --profile pi-herdr --dry-run -- /usr/bin/true >/dev/null
         herdr --version
         pi --version
+        test "$(find "$HOME/.pi/agent/skills/mattpocock" -type f -name SKILL.md | wc -l)" -gt 0
       args: {executable: /bin/bash}
       changed_when: false
 YAML
