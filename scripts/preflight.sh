@@ -23,7 +23,7 @@ if [[ -d /sys/firmware/efi ]]; then current=uefi; else current=bios; fi
 [[ -b "$disk" && "$(lsblk -dn -o TYPE "$disk")" == disk ]] || { echo 'Selected target is not a whole disk'; exit 1; }
 ip link show "$iface" >/dev/null 2>&1 || { echo 'Configured network interface not present'; exit 1; }
 actual_mac="$(cat "/sys/class/net/$iface/address")"
-[[ "${actual_mac,,}" == "${mac,,}" ]] || { echo "Network MAC changed: expected $mac; got $actual_mac"; exit 1; }
+[[ "$(printf %s "$actual_mac" | tr "[:upper:]" "[:lower:]")" == "$(printf %s "$mac" | tr "[:upper:]" "[:lower:]")" ]] || { echo "Network MAC changed: expected $mac; got $actual_mac"; exit 1; }
 if [[ "$(id -u)" != 0 ]]; then sudo -n true || { echo 'Root SSH or passwordless sudo required'; exit 1; }; fi
 echo 'Disk verification:'; lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS "$disk"
 echo 'Current network:'; ip -brief address show "$iface"; ip route show default
@@ -58,7 +58,7 @@ echo 'NixOS system evaluation passed.'
 echo 'Validating effective networkd match, address, gateway and SSH...'
 net="path:$DEPLOY#nixosConfigurations.agentic.config.systemd.network.networks.\"10-agentic\""
 match_mac="$(nix eval --raw "$net.matchConfig.MACAddress")"
-[[ "${match_mac,,}" == "${mac,,}" ]] || { echo "Effective MAC mismatch ($match_mac != $mac)" >&2; exit 1; }
+[[ "$(printf %s "$match_mac" | tr "[:upper:]" "[:lower:]")" == "$(printf %s "$mac" | tr "[:upper:]" "[:lower:]")" ]] || { echo "Effective MAC mismatch ($match_mac != $mac)" >&2; exit 1; }
 nix eval --json "path:$DEPLOY#nixosConfigurations.agentic.config.services.openssh.enable" | grep -qx true
 mode="$(cat "$DEPLOY/network-mode.txt")"
 if [[ "$mode" == static ]]; then
