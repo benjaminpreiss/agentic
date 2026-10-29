@@ -795,6 +795,15 @@ cat > "$playbook" <<'YAML'
       changed_when: "'Firewall is active' in ufw_enable_result.stdout"
       when: lookup('env', 'ENABLE_UFW') == 'true'
 
+    - name: Create shared read-only agentic status directory
+      become_user: root
+      ansible.builtin.file:
+        path: /var/lib/agentic
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
     - name: Write readable host security status for agent login screen
       become_user: root
       ansible.builtin.copy:
