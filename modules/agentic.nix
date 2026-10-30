@@ -103,12 +103,24 @@ in {
   # Registry packs are mutable upstream. They are installed as the agent user,
   # outside the Nix store, and refreshed periodically after a local backup.
   systemd.services.agentic-nono-pack = {
-    description = "Refresh reviewed nono Pi registry pack";
+    description = "Install and refresh the verified nono Pi registry pack";
+    # Provision immediately, before the user first starts nnpi, rather than
+    # relying solely on the daily refresh timer.
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "agentic-skills.service" ];
     after = [ "agentic-skills.service" "network-online.target" ];
     wants = [ "network-online.target" ];
-    serviceConfig = { Type = "oneshot"; User = "agentic"; Environment = "HOME=/home/agentic"; };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "agentic";
+      Environment = "HOME=/home/agentic";
+      RemainAfterExit = true;
+    };
+    path = [ nonoPkg pkgs.coreutils ];
     script = ''
       ${nonoPkg}/bin/nono pull nolabs-ai/pi
+      # Verify resolution of the provisioned child profile without launching Pi.
+      ${nonoPkg}/bin/nono run --profile pi-herdr --allow-cwd --dry-run -- ${pkgs.coreutils}/bin/true >/dev/null
     '';
   };
   systemd.timers.agentic-nono-pack = {
