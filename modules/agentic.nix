@@ -17,7 +17,9 @@ let
         "$work_root/"*) ;;
         *) echo "nnpi: work inside ~/work; run: cd ~/work" >&2; exit 2 ;;
       esac
-      exec ${nonoPkg}/bin/nono run --profile pi-herdr --allow-cwd -- ${piPkg}/bin/pi "$@"
+      exec ${nonoPkg}/bin/nono run --profile pi-herdr --allow-cwd \
+        --allow-unix-socket /run/agentic-github-mcp.sock \
+        -- ${piPkg}/bin/pi "$@"
     '';
   };
   tcpPorts = config.networking.firewall.allowedTCPPorts;
@@ -73,6 +75,7 @@ let
   };
 
 in {
+  imports = [ ./github-mcp.nix ];
   environment.systemPackages = [ nnpi status backup pkgs.ghostty.terminfo piPkg nonoPkg herdrPkg ];
 
   # Pi discovers recursively under ~/.pi/agent/skills. Install skills via

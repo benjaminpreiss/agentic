@@ -7,15 +7,66 @@ for f in flake.nix flake.lock generated/machine.nix generated/facter.json target
 done
 TARGET="${TARGET:-$(cat "$DEPLOY/target.txt")}"; HOST="${TARGET#*@}"
 [[ -n "$HOST" && "$HOST" != "$TARGET" ]] || { echo 'Expected user@host in target.txt' >&2; exit 1; }
-for f in flake.nix modules/base.nix modules/agentic.nix; do
+for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix; do
   [[ -f "$ROOT/$f" ]] || { echo "Missing $f" >&2; exit 1; }
   cp "$ROOT/$f" "$DEPLOY/$f"
 done
+# Secrets are streamed directly over SSH, never placed beneath .deployment:
+# Nix may copy the entire evaluated flake source into the world-readable store.
+sync_github_app_secrets() {
+  local secrets="$ROOT/secrets/github-app"
+  local envfile="$secrets/app.env"
+  local keyfile="$secrets/private-key.pem"
+  if [[ ! -e "$envfile" && ! -e "$keyfile" ]]; then
+    echo 'No local GitHub App credentials: retaining any credentials already on VPS.'
+    return 0
+  fi
+  [[ -f "$envfile" && -f "$keyfile" && ! -L "$envfile" ]] || {
+    echo 'Missing app.env or active private-key.pem in secrets/github-app/.' >&2
+    return 1
+  }
+  # The active key may be a symlink to another PEM in this same folder.
+  # Reject links outside the secrets directory, including dangling links.
+  local resolved_dir resolved_key
+  resolved_dir="$(cd "$secrets" && pwd -P)"
+  resolved_key="$(realpath -e "$keyfile")" || return 1
+  case "$resolved_key" in
+    "$resolved_dir"/*) ;;
+    *) echo 'private-key.pem must point to a PEM within secrets/github-app/' >&2; return 1 ;;
+  esac
+  local app_id installation_id
+  app_id="$(sed -n 's/^GITHUB_APP_ID=//p' "$envfile")"
+  installation_id="$(sed -n 's/^GITHUB_APP_INSTALLATION_ID=//p' "$envfile")"
+  [[ "$app_id" =~ ^[0-9]+$ && "$installation_id" =~ ^[0-9]+$ ]] || {
+    echo 'Invalid GitHub App IDs in app.env' >&2; return 1;
+  }
+  grep -q -- '-----BEGIN .*PRIVATE KEY-----' "$keyfile" || {
+    echo 'Invalid private key PEM' >&2; return 1;
+  }
+  echo "Uploading GitHub App credentials to root@$HOST over SSH..."
+  # Archive is transmitted via the SSH pipe; no shared /tmp files and no Nix store.
+  tar -h -C "$secrets" -cf - app.env private-key.pem |     ssh -o BatchMode=yes "root@$HOST" 'set -eu
+      umask 077
+      install -d -m 0700 -o root -g root /etc/agentic
+      install -d -m 0700 -o root -g root /etc/agentic/github-app
+      staging="$(mktemp -d /etc/agentic/.github-app.XXXXXXXX)"
+      trap '''rm -rf "$staging"''' EXIT
+      tar -xf - -C "$staging" --no-same-owner --no-same-permissions
+      test -s "$staging/app.env"
+      test -s "$staging/private-key.pem"
+      install -m 0600 -o root -g root "$staging/app.env" /etc/agentic/github-app/.app.env.new
+      install -m 0600 -o root -g root "$staging/private-key.pem" /etc/agentic/github-app/.private-key.pem.new
+      mv -f /etc/agentic/github-app/.app.env.new /etc/agentic/github-app/app.env
+      mv -f /etc/agentic/github-app/.private-key.pem.new /etc/agentic/github-app/private-key.pem
+    '
+  echo 'GitHub App credentials installed as root-only files.'
+}
 printf 'Evaluating NixOS system (no disk changes)...\n'
 nix eval --raw "path:$DEPLOY#nixosConfigurations.agentic.config.system.build.toplevel.drvPath" >/dev/null
 printf 'Apply NixOS changes to root@%s (no repartition)? [y/N] ' "$HOST" >/dev/tty
 IFS= read -r answer </dev/tty
 [[ "$answer" == y || "$answer" == Y ]] || exit 0
+sync_github_app_secrets
 nix run nixpkgs#nixos-rebuild -- switch --flake "path:$DEPLOY#agentic" \
   --target-host "root@$HOST" --build-host "root@$HOST"
 echo 'NixOS activated. Preparing and verifying nono user-state...'
