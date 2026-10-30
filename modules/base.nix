@@ -17,6 +17,9 @@ let cfg = config.agenticMachine; in {
     networking.hostName = cfg.hostname;
     networking.useNetworkd = true;
     systemd.network.enable = true;
+    # Only one usable interface needs to be online. Secondary interfaces may
+    # have carrier but no DHCP lease, and must not block service activation.
+    systemd.network.wait-online.anyInterface = true;
     networking.useDHCP = false;
     assertions = [{ assertion = cfg.networkMAC != ""; message = "A confirmed network interface MAC address is required"; }];
     systemd.network.networks."10-agentic" = {

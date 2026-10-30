@@ -71,6 +71,7 @@ let
       echo "Backup completed: $dest"
     '';
   };
+
 in {
   environment.systemPackages = [ nnpi status backup pkgs.ghostty.terminfo piPkg nonoPkg herdrPkg ];
 
@@ -83,11 +84,14 @@ in {
     serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
     path = [ pkgs.coreutils ];
     script = ''
-      install -d -o agentic -g users -m 0755 /home/agentic/.pi/agent/skills
+      install -d -o agentic -g users -m 0755 /home/agentic/.pi /home/agentic/.pi/agent /home/agentic/.pi/agent/skills
+      install -d -o agentic -g users -m 0755 /home/agentic/.config /home/agentic/.config/nono
+      install -d -o agentic -g users -m 0700 /home/agentic/.config/nono/profiles
       if [ ! -e /home/agentic/.pi/agent/skills/mattpocock ]; then
         ln -s ${skillsSource} /home/agentic/.pi/agent/skills/mattpocock
       fi
-      install -d -o agentic -g users -m 0700 /home/agentic/.config/nono/profiles
+      # Registry state directories are owned by agentic via tmpfiles below.
+      # This service only creates the Pi profile; it never touches nono packs.
       cat > /home/agentic/.config/nono/profiles/pi-herdr.json <<'PROFILE'
       {
         "extends": "nolabs-ai/pi",
@@ -100,34 +104,6 @@ in {
       chmod 0600 /home/agentic/.config/nono/profiles/pi-herdr.json
     '';
   };
-  # Registry packs are mutable upstream. They are installed as the agent user,
-  # outside the Nix store, and refreshed periodically after a local backup.
-  systemd.services.agentic-nono-pack = {
-    description = "Install and refresh the verified nono Pi registry pack";
-    # Provision immediately, before the user first starts nnpi, rather than
-    # relying solely on the daily refresh timer.
-    wantedBy = [ "multi-user.target" ];
-    requires = [ "agentic-skills.service" ];
-    after = [ "agentic-skills.service" "network-online.target" ];
-    wants = [ "network-online.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      User = "agentic";
-      Environment = "HOME=/home/agentic";
-      RemainAfterExit = true;
-    };
-    path = [ nonoPkg pkgs.coreutils ];
-    script = ''
-      ${nonoPkg}/bin/nono pull nolabs-ai/pi
-      # Verify resolution of the provisioned child profile without launching Pi.
-      ${nonoPkg}/bin/nono run --profile pi-herdr --allow-cwd --dry-run -- ${pkgs.coreutils}/bin/true >/dev/null
-    '';
-  };
-  systemd.timers.agentic-nono-pack = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = { OnBootSec = "3min"; OnCalendar = "daily"; RandomizedDelaySec = "30min"; Persistent = true; };
-  };
-
   # Automatic update checks, rather than unreviewed live configuration swaps.
   # The pinned flake is upgraded deliberately from the deployment host.
   nix.gc = { automatic = true; dates = "weekly"; options = "--delete-older-than 30d"; };
@@ -135,6 +111,15 @@ in {
   system.autoUpgrade.enable = false;
   systemd.tmpfiles.rules = [
     "d /home/agentic/work 0750 agentic users - -"
+    "d /home/agentic/.pi 0755 agentic users - -"
+    "d /home/agentic/.pi/agent 0755 agentic users - -"
+    "z /home/agentic/.pi 0755 agentic users - -"
+    "z /home/agentic/.pi/agent 0755 agentic users - -"
+    "d /home/agentic/.config 0755 agentic users - -"
+    "d /home/agentic/.config/nono 0755 agentic users - -"
+    "d /home/agentic/.config/nono/profiles 0700 agentic users - -"
+    "d /home/agentic/.config/nono/packages 0700 agentic users - -"
+    "d /home/agentic/.config/nono/profile-drafts 0700 agentic users - -"
     "d /var/backups/agentic 0700 root root - -"
   ];
   # Prevent zsh-newuser-install. This creates only the startup file if absent;
