@@ -4,10 +4,15 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    pi.url = "github:earendil-works/pi/stable";
+    nono.url = "github:nolabs-ai/nono";
+    herdr.url = "github:herdrdev/herdr";
+    matt-skills = { url = "github:mattpocock/skills"; flake = false; };
   };
-  outputs = { nixpkgs, disko, ... }: {
+  outputs = inputs@{ nixpkgs, disko, ... }: {
     nixosConfigurations.agentic = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
       modules = [
         disko.nixosModules.disko
         ./modules/base.nix
@@ -16,8 +21,6 @@
         ./modules/recovery.nix
         ./modules/firstboot.nix
         ./generated/machine.nix
-        # nixos-anywhere generates this during installation. The path is
-        # absent during the initial flake evaluation and added afterwards.
         ({ lib, ... }: lib.mkIf (builtins.pathExists ./generated/facter.json) {
           hardware.facter.reportPath = ./generated/facter.json;
         })
