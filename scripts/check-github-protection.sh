@@ -96,12 +96,10 @@ for repo in "${repos[@]}"; do
     if ((page > 50)); then fail 'branch listing: pagination limit exceeded'; listing_ok=false; break; fi
   done
   [[ "$listing_ok" == true ]] || continue
-  # Explicitly fail when either policy anchor is absent, even if the list is empty.
-  for anchor in main agentic; do
-    found=false
-    for name in "${branches[@]}"; do [[ "$name" != "$anchor" ]] || found=true; done
-    [[ "$found" == true ]] || fail "$anchor exists: branch not found"
-  done
+  # main is the only required named target; agentic/* branches are optional.
+  found=false
+  for name in "${branches[@]}"; do [[ "$name" != main ]] || found=true; done
+  [[ "$found" == true ]] || fail 'main exists: branch not found'
   for branch in "${branches[@]}"; do
     printf '  ── %s ──\n' "$branch"
     # GitHub branch names may contain slash, spaces, and other URL-significant

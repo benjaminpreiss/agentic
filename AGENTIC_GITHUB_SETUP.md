@@ -2,7 +2,7 @@
 
 This guide sets up **GitHub's official MCP server** and a **Git HTTPS credential helper** for the NixOS coding VPS, with GitHub App credentials supplied from your Mac. Pi runs inside nono; the MCP server and token broker keep the App private key outside the sandbox. Git receives a short-lived token scoped to the repository being pushed. The Git helper supports repositories on `github.com` where this **one GitHub App** is installed, including multiple installations of the same App; simultaneous use of multiple different GitHub Apps is not supported.
 
-**Target-branch policy:** agents work on `agentic` or `agentic/*` branches. Agent-initiated merges into `agentic/*` may proceed without owner approval, subject to checks. Merges into the exact `agentic` branch, `main`, or any other target require a **current approval from benjaminpreiss** plus required checks. The PR's source branch does not change this rule.
+**Target-branch policy:** agents work on `agentic/*` branches; the exact `agentic` branch is being retired. Agent-initiated merges into `agentic/*` may proceed without owner approval, subject to checks. Merges into the exact `agentic` branch, `main`, or any other target require a **current approval from benjaminpreiss** plus required checks. The PR's source branch does not change this rule.
 
 > The older custom Go/Python GitHub API broker and `agentic-gh` CLI are **not part of this setup**. GitHub rulesets alone cannot enforce the named-reviewer policy. The unfiltered official MCP server and Git credential broker are **not safe merge authorization boundaries**; do not give agents unrestricted PR-write or issue-write credentials if this policy is required.
 
@@ -38,22 +38,13 @@ Choose a **private App**. Leave **webhooks disabled** and **OAuth on installatio
 
 On the App's **General** page, record the **App ID** and generate/download a **private key** (`.pem`). Also record the **installation ID** associated with the installation. Never paste the PEM into chat, Pi, or the repository.
 
-## 3. Prepare the `agentic` branch
+## 3. Prepare target branches
 
-Confirm `main` and `agentic` are present on GitHub. If `agentic` is absent, create it from `main` in a trusted Git checkout on your Mac:
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c agentic
-git push -u origin agentic
-```
-
-Do **not** recreate the branch if it already exists.
+Keep `main` protected. Create `agentic/*` targets as needed and protect them with wildcard rulesets. Do **not** create or rely on the exact `agentic` branch; retire it after migrating existing PRs and dependent workflows. Existing `agentic` remains subject to owner approval until deleted.
 
 ```text
 agentic/fix-123 ── PR + checks ──> agentic/release
-agentic/feature ── PR + owner approval + checks ──> agentic ── PR + owner approval + checks ──> main
+agentic/feature ── PR + owner approval + checks ──> main
 ```
 
 ## 4. Audit branch protection for the configured installation
@@ -66,15 +57,15 @@ bash scripts/check-github-protection.sh
 
 The audit prints **✅ for every passing check**, **⚠️ for warnings** (such as missing CI), and **❌ for blocking failures**, with a summary and nonzero exit status if any blocking check fails.
 
-The Bash script requires `curl`, `jq`, `openssl`, `base64`, and standard macOS command-line utilities. It uses your GitHub App ID, installation ID and selected PEM from `secrets/github-app/`. It creates a short-lived installation token **in memory**, lists **every repository accessible to the configured installation** (including paginated results), and checks the active GitHub branch rules for **every existing branch**, including `main`, `agentic`, `agentic/*` and other targets, in each repository. The audit does not cover other installations of the same App; audit and protect those repositories separately. No permanent token is saved; no rulesets are changed.
+The Bash script requires `curl`, `jq`, `openssl`, `base64`, and standard macOS command-line utilities. It uses your GitHub App ID, installation ID and selected PEM from `secrets/github-app/`. It creates a short-lived installation token **in memory**, lists **every repository accessible to the configured installation** (including paginated results), and checks the active GitHub branch rules for **every existing branch**, including `main`, `agentic/*` and other targets (and the legacy `agentic` branch while it exists), in each repository. The audit does not cover other installations of the same App; audit and protect those repositories separately. No permanent token is saved; no rulesets are changed.
 
-The audit checks **squash-only merging independently on `main` and `agentic`**, using each branch’s effective `pull_request` ruleset parameters (`allowed_merge_methods: ["squash"]`). Configure **Allowed merge methods → Squash** in the ruleset targeting each branch. There is **no requirement to disable merge or rebase methods repository-wide**. If GitHub does not expose the rule’s allowed methods, the audit reports a blocking failure rather than claiming compliance.
+The audit checks **squash-only merging independently on each existing branch**, using each branch’s effective `pull_request` ruleset parameters (`allowed_merge_methods: ["squash"]`). Configure **Allowed merge methods → Squash** in the ruleset targeting each branch. There is **no requirement to disable merge or rebase methods repository-wide**. If GitHub does not expose the rule’s allowed methods, the audit reports a blocking failure rather than claiming compliance.
 
 It checks for required PRs, at least one required approval and dismissal of stale approvals after new commits on every target outside `agentic/*`, protection against force pushes, and protection against branch deletion. It also prints **required/available CI checks** for each branch (for example `1/2` or `2/2`). “Available” means distinct check runs and commit status contexts observed on the branch’s **current tip commit**; “required” is the number of those observed contexts selected by effective branch rules. `2/2` counts as a pass; `1/2` and `0/0` are warnings, not blocking failures. Checks that only run on PRs may not appear on a branch tip, so this is a snapshot, not a complete CI inventory. Missing branches, required protection rules, and API errors still fail the audit. An exit code of `0` means no blocking findings were detected; **warnings can still be present**.
 
 **IMPORTANT:** An audit is not enforcement. The script **does not create rulesets**; effective branch rules do not prove reviewer identity, App bypass permissions, or protection of future branches. A native approval count cannot require *benjaminpreiss* specifically. Even a passing audit is **not proof** of authorization. Inspect bypass actors for every applicable repository/organization ruleset with an administrator, and protect future branches via wildcard rulesets. Never treat the current unfiltered MCP PR-write route as compliant.
 
-To fix missing protections: on GitHub, open the affected repository and navigate to **Settings → Rules → Rulesets → New branch ruleset**. Apply **Active** rulesets matching the audit's missing requirements. For `agentic/*`, use zero required approvals if agents should merge autonomously. Require approval and stale-review dismissal on `agentic`, `main`, and all other targets. When CI workflows have run, select their status checks in each ruleset; the audit will stop warning about missing CI. Re-run the audit after fixing blocking findings.
+To fix missing protections: on GitHub, open the affected repository and navigate to **Settings → Rules → Rulesets → New branch ruleset**. Apply **Active** rulesets matching the audit's missing requirements. For `agentic/*`, use zero required approvals if agents should merge autonomously. Require approval and stale-review dismissal on `main` and all other targets outside `agentic/*`, including the legacy `agentic` branch if present. When CI workflows have run, select their status checks in each ruleset; the audit will stop warning about missing CI. Re-run the audit after fixing blocking findings.
 
 For GitHub API details see [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) and [installation repositories](https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation).
 
@@ -236,7 +227,7 @@ Reference: [GitHub MCP — GitHub App authentication](https://github.com/github/
 
 ## 9. Verify the real permissions
 
-Run `bash scripts/check-github-protection.sh`. Resolve blocking failures before deployment; missing CI checks are warnings until CI is configured. With disposable branches and PRs, test using **the actual App credentials**: a checks-passing PR into `agentic/*` without owner approval; rejected merges into `agentic` and `main` without owner approval (including when another reviewer approves); successful merges into each after the owner's current approval and required checks; and rejection into another non-`agentic/*` target without owner approval. Push a new commit after approval and confirm old approval no longer authorizes a merge. Check that the App cannot bypass rulesets or push directly to protected branches. Do not run destructive tests against production PRs. Record HTTP outcomes and any tests you could not perform. These tests alone cannot prove future branches or reviewer identity enforcement by rulesets.
+Run `bash scripts/check-github-protection.sh`. Resolve blocking failures before deployment; missing CI checks are warnings until CI is configured. With disposable branches and PRs, test using **the actual App credentials**: a checks-passing PR into `agentic/*` without owner approval; rejected merges into `main` without owner approval (including when another reviewer approves); a successful merge into `main` after the owner's current approval and required checks; and rejection into another non-`agentic/*` target without owner approval. While the legacy `agentic` branch exists, test it as another protected non-`agentic/*` target. Push a new commit after approval and confirm old approval no longer authorizes a merge. Check that the App cannot bypass rulesets or push directly to protected branches. Do not run destructive tests against production PRs. Record HTTP outcomes and any tests you could not perform. These tests alone cannot prove future branches or reviewer identity enforcement by rulesets.
 
 **Deployment blocker:** this repository does not ship a trusted merge or label-scoped issue mutation service. Native rulesets cannot enforce the *identity* of the approver. Until a separate service is built, agents must not have an unrestricted App PR-write or Issues-write route (including MCP, raw API tokens, or another installation). A merge service must read the PR base and current head, check benjaminpreiss's non-dismissed approval on that head and required checks, then merge with the expected head SHA; it must verify the base is still the intended target immediately before the merge. For `agentic/*`, it may omit the owner-approval check, not the checks/head validation. Give the service its own narrowly accessible write credential; do not expose it via the Git token socket. Similarly, Issues write is repository-wide: if label-scoped close/move is required, route *each mutation* through a service which rechecks the `agentic` label and issue identity before writing, with no alternate Issues-write route. This work is **not implemented** here; no claim of enforcement is made by this audit or by the official MCP server.
 
@@ -248,13 +239,13 @@ cd ~/work
 nnpi
 ```
 
-From a checkout with a GitHub HTTPS `origin` where this App is installed, start from the appropriate base branch, create a work branch, commit locally, and run `git push -u origin HEAD`. The Git credential helper supplies a fresh token scoped to that repository; no manual token export is needed. For this repo, open the PR into `agentic` with MCP only while the current unrestricted App credentials remain available; this is **not** enforcement of the target policy. Neither the helper nor the broker limits which branch you push: configure GitHub rulesets for protected branches in **each** installed repository.
+From a checkout with a GitHub HTTPS `origin` where this App is installed, start from the appropriate base branch, create a work branch, commit locally, and run `git push -u origin HEAD`. The Git credential helper supplies a fresh token scoped to that repository; no manual token export is needed. For this repo, open a PR into an appropriate target; during migration an existing `agentic` target still requires owner approval. Current unrestricted App credentials are **not** enforcement of the target policy. Neither the helper nor the broker limits which branch you push: configure GitHub rulesets for protected branches in **each** installed repository.
 
 Example agent instruction:
 
-> Start from `agentic`, create an `agentic/*` branch, implement and test the change, then open a PR. Do not initiate merges into any branch except `agentic/*` without benjaminpreiss's current approval and passing required checks. Never push directly to protected branches. Until a trusted merge gate replaces unrestricted App PR-write access, do not treat these instructions as an access-control boundary.
+> Start from the appropriate target, create an `agentic/*` branch, implement and test the change, then open a PR. Do not initiate merges into any branch except `agentic/*` without benjaminpreiss's current approval and passing required checks. Never push directly to protected branches. Until a trusted merge gate replaces unrestricted App PR-write access, do not treat these instructions as an access-control boundary.
 
-Humans periodically review `agentic` and promote changes to `main` via GitHub PRs.
+Humans review PRs into `main` and other non-`agentic/*` targets; the legacy exact `agentic` branch should be retired after migration.
 
 ## Official references
 
