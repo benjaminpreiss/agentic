@@ -167,50 +167,46 @@ Then test **inside Pi** that the GitHub MCP tools are available and can read the
 ### Authentication architecture
 
 ```text
-============================ AGENTIC VPS =============================
-
-+------------------------- Pi / nono sandbox ------------------------+
-| Pi (uid agentic)                                                  |
-|   Git push -> Git HTTPS credential helper -> token request        |
-|   Git push -> github.com over HTTPS, using returned token         |
-|   MCP client -> GitHub MCP socket (separate path)                  |
-+--------------------------------------------------------------------+
-     | owner/repo to Git socket; short-lived token back
-     | MCP messages to MCP socket; MCP responses back
--------------------- nono / host process seam -----------------------
-
-                      host systemd (outside nono)
-+-------------------------------+   +-------------------------------+
-| Git credentials socket        |   | GitHub MCP socket             |
-| /run/agentic-git-             |   | /run/agentic-github-mcp.sock  |
-| credentials.sock (mode 0600)  |   | (mode 0600)                   |
-+---------------+---------------+   +---------------+---------------+
-                | Accept=true                       | Accept=true
-                | one instance per connection       | one per connection
-+---------------v---------------+   +---------------v---------------+
-| agentic-git-credentials@0     |   | agentic-github-mcp@0          |
-| token broker: one request     |   | stdio; PR/issue tools         |
-+-------------------------------+   +-------------------------------+
-+-------------------------------+   +-------------------------------+
-| agentic-git-credentials@1     |   | agentic-github-mcp@1          |
-| next/concurrent connection    |   | next/concurrent connection    |
-+-------------------------------+   +-------------------------------+
-
-+------------------------- systemd credentials ----------------------+
-| root-owned App PEM -> LoadCredential -> service instances only    |
-| app.env: App ID; MCP also uses one installation ID                |
-| Git broker: JWT -> installation lookup -> per-repo token          |
-+--------------------------------------------------------------------+
-
-+-------------------------- one-shot setup --------------------------+
-| agentic-configure-git-credentials.service (runs as agentic)       |
-| -> configure-git-credentials.sh -> ~/.gitconfig (helper, no token) |
-+--------------------------------------------------------------------+
-
---------------------- VPS / GitHub network seam ---------------------
-Git HTTPS from Pi; broker/MCP GitHub API requests from host systemd
-+------------------------ GitHub (remote) ---------------------------+
-| App installation permissions + repo rulesets constrain actions.  |
++========================== AGENTIC VPS ==========================+
+|                                                                 |
+| +---------------- Pi / nono sandbox (uid agentic) ------------+ |
+| | Pi: Git -> Git credential helper (requests owner/repo)      | |
+| |     Git -> HTTPS push with returned token to GitHub         | |
+| |     MCP client -> GitHub MCP socket                          | |
+| +-------------------------------------------------------------+ |
+|    | repo request / token response       | MCP messages         |
+| ---------------- nono / host process seam ---------------------- |
+|                                                                 |
+|                 host systemd (outside nono)                      |
+| +---------------------------+  +------------------------------+ |
+| | Git credentials socket    |  | GitHub MCP socket            | |
+| | /run/agentic-git-         |  | /run/agentic-github-         | |
+| | credentials.sock (0600)   |  | mcp.sock (0600)              | |
+| +-------------+-------------+  +--------------+---------------+ |
+|        Accept=true: one service instance per connection          |
+| +-------------v-------------+  +--------------v---------------+ |
+| | agentic-git-credentials@0 |  | agentic-github-mcp@0          | |
+| | broker: one request       |  | stdio; PR/issue tools         | |
+| +---------------------------+  +------------------------------+ |
+| +---------------------------+  +------------------------------+ |
+| | agentic-git-credentials@1 |  | agentic-github-mcp@1          | |
+| | another connection        |  | another connection           | |
+| +---------------------------+  +------------------------------+ |
+|                                                                 |
+| App PEM: root-owned -> systemd LoadCredential -> instances only  |
+| app.env: App ID; MCP also uses one installation ID               |
+| Git broker: JWT -> installation lookup -> per-repo token         |
+|                                                                 |
+| +--------------------- one-shot setup -------------------------+ |
+| | agentic-configure-git-credentials.service (as agentic)      | |
+| | -> configure-git-credentials.sh -> ~/.gitconfig (no token)   | |
+| +-------------------------------------------------------------+ |
+|                                                                 |
++====================== VPS / network seam =========================+
+          | Git HTTPS from Pi; broker/MCP GitHub API from host
+          v
++------------------------- GitHub (remote) --------------------------+
+| App installation permissions + repository rulesets limit actions. |
 +--------------------------------------------------------------------+
 ```
 
