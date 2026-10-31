@@ -7,9 +7,20 @@ for f in flake.nix flake.lock generated/machine.nix generated/facter.json target
 done
 TARGET="${TARGET:-$(cat "$DEPLOY/target.txt")}"; HOST="${TARGET#*@}"
 [[ -n "$HOST" && "$HOST" != "$TARGET" ]] || { echo 'Expected user@host in target.txt' >&2; exit 1; }
-for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix; do
+# The Nix module reads these shell sources at evaluation time, so stage them
+# alongside the module. They contain code only; credentials never enter the flake.
+mkdir -p "$DEPLOY/scripts"
+for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix \
+  scripts/git-app-token-broker.sh scripts/git-credential-helper.sh \
+  scripts/configure-git-credentials.sh; do
   [[ -f "$ROOT/$f" ]] || { echo "Missing $f" >&2; exit 1; }
   cp "$ROOT/$f" "$DEPLOY/$f"
+done
+# Local nono profiles are part of the flake source too.
+mkdir -p "$DEPLOY/profiles"
+for f in pi-herdr.json omp-agentic.json; do
+  [[ -f "$ROOT/profiles/$f" ]] || { echo "Missing profiles/$f" >&2; exit 1; }
+  cp "$ROOT/profiles/$f" "$DEPLOY/profiles/$f"
 done
 # Secrets are streamed directly over SSH, never placed beneath .deployment:
 # Nix may copy the entire evaluated flake source into the world-readable store.
@@ -94,10 +105,13 @@ if ! printf '%s\n' "$installed" | grep -Fq 'nolabs-ai/pi'; then
 fi
 # The pull is intentionally performed under the actual agent identity.
 runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin "$nono" pull nolabs-ai/pi
+runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin "$nono" pull nolabs-ai/omp
 runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin "$nono" list --installed
 runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin sh -c \
   'cd /home/agentic/work && exec nono run --profile pi-herdr --allow-cwd --dry-run -- /run/current-system/sw/bin/true' >/dev/null
-echo 'nono package and pi-herdr profile verified.'
+runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin sh -c \
+  'cd /home/agentic/work && exec nono run --profile omp-agentic --allow-cwd --dry-run -- /run/current-system/sw/bin/true' >/dev/null
+echo 'nono packages and pi-herdr/omp-agentic profiles verified.'
 REMOTE
 then
   echo 'Apply completed, including nono verification.'

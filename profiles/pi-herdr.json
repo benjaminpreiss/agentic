@@ -1,0 +1,6 @@
+{
+  "extends": "nolabs-ai/pi",
+  "meta": {"name": "pi-herdr", "version": "1.0.1"},
+  "workdir": {"access": "readwrite"},
+  "filesystem": {"allow": ["$HOME/work"], "read": ["$HOME/.pi/agent/skills"]}
+}

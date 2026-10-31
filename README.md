@@ -141,7 +141,7 @@ scripts/
 
 The current NixOS bundle defines the `agentic` user and `~/work`, Zsh and Starship, Ghostty terminfo, SSH and MAC-based networking, basic OS hardening, firewall configuration, a terminal status screen, a console recovery user, first-boot diagnostics, and local home-directory backups (14-archive retention).
 
-**Not yet implemented declaratively:** the actual Pi harness installation, nono sandbox and profile, Herdr/Herdr Core, Matt Pocock skills, GitHub MCP/App authentication, and unattended NixOS system upgrades. The included `nnpi` launcher is a placeholder until Pi and nono are installed. Do not assume feature parity with the earlier Ubuntu `nnpi.sh`.
+Pi, nono, Herdr, skills, GitHub MCP/App authentication, and GitHub App-backed Git HTTPS credentials are declared in the NixOS modules. Git push to any GitHub HTTPS repository where this App is installed requires deploying those modules and App credentials; multiple different GitHub Apps are not supported simultaneously. See `AGENTIC_GITHUB_SETUP.md` for setup and verification. Unattended NixOS system upgrades remain disabled. Do not assume feature parity with the earlier Ubuntu `nnpi.sh`.
 
 The backup archives live on the same server and are **not** a substitute for off-server backups. The flake and hardware/network setup still need end-to-end testing for each target environment.
 
