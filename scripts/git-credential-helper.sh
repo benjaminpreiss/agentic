@@ -17,6 +17,12 @@ done
 path="${path%.git}"
 [[ "$path" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$ ]] || exit 0
 
-token="$(printf '%s\n' "$path" | socat - "UNIX-CONNECT:$socket")" || exit 1
-[[ "$token" =~ ^[A-Za-z0-9_]+$ ]] || exit 1
+# stdin closes immediately after the repository line. socat's default 0.5s
+# EOF grace period can close the socket before the broker completes two API
+# requests; allow slightly longer than their combined 60s curl timeouts.
+token="$(printf '%s\n' "$path" | socat -t 75 - "UNIX-CONNECT:$socket")" || exit 1
+# The broker checks for nonempty printable ASCII. Tokens are opaque, and GitHub
+# may include punctuation; only exclude characters unsafe for line-based Git
+# credential output, rather than relying on a guessed token alphabet.
+[[ "$token" =~ ^[[:graph:]]+$ ]] || exit 1
 printf 'username=x-access-token\npassword=%s\n\n' "$token"
