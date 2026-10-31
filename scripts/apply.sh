@@ -29,7 +29,7 @@ sync_github_app_secrets() {
   # Reject links outside the secrets directory, including dangling links.
   local resolved_dir resolved_key
   resolved_dir="$(cd "$secrets" && pwd -P)"
-  resolved_key="$(realpath -e "$keyfile")" || return 1
+  resolved_key="$(realpath "$keyfile")" || return 1
   case "$resolved_key" in
     "$resolved_dir"/*) ;;
     *) echo 'private-key.pem must point to a PEM within secrets/github-app/' >&2; return 1 ;;
@@ -40,7 +40,7 @@ sync_github_app_secrets() {
   [[ "$app_id" =~ ^[0-9]+$ && "$installation_id" =~ ^[0-9]+$ ]] || {
     echo 'Invalid GitHub App IDs in app.env' >&2; return 1;
   }
-  grep -q -- '-----BEGIN .*PRIVATE KEY-----' "$keyfile" || {
+  openssl pkey -in "$keyfile" -noout >/dev/null 2>&1 || {
     echo 'Invalid private key PEM' >&2; return 1;
   }
   echo "Uploading GitHub App credentials to root@$HOST over SSH..."
@@ -50,7 +50,7 @@ sync_github_app_secrets() {
       install -d -m 0700 -o root -g root /etc/agentic
       install -d -m 0700 -o root -g root /etc/agentic/github-app
       staging="$(mktemp -d /etc/agentic/.github-app.XXXXXXXX)"
-      trap '''rm -rf "$staging"''' EXIT
+      trap "rm -rf -- \"$staging\"" EXIT
       tar -xf - -C "$staging" --no-same-owner --no-same-permissions
       test -s "$staging/app.env"
       test -s "$staging/private-key.pem"

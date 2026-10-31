@@ -1,6 +1,38 @@
 { pkgs, lib, ... }:
 let
   socketPath = "/run/agentic-github-mcp.sock";
+
+  # The github-mcp-server package in our current nixpkgs is 1.1.2 and does
+  # not implement GitHub App authentication. Use the official v2.0.3 binary
+  # with its fixed SHA-256. Do not put private keys in the Nix store.
+  githubMcpServer = pkgs.stdenvNoCC.mkDerivation {
+    pname = "github-mcp-server";
+    version = "2.0.3";
+    src = pkgs.fetchurl {
+      url = "https://github.com/github/github-mcp-server/releases/download/v2.0.3/github-mcp-server_Linux_x86_64.tar.gz";
+      hash = "sha256-95fCD+AqdVhl0OLUYYSrR+Mb8WGbCFW42JxTHkWmUcI=";
+    };
+    dontUnpack = true;
+    nativeBuildInputs = [ pkgs.gnutar pkgs.gzip pkgs.findutils ];
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out/bin" "$TMPDIR/github-mcp-unpack"
+      tar -xzf "$src" -C "$TMPDIR/github-mcp-unpack"
+      binary="$(find "$TMPDIR/github-mcp-unpack" -type f -name github-mcp-server -print -quit)"
+      if [ -z "$binary" ]; then
+        echo "GitHub MCP release did not contain github-mcp-server" >&2
+        exit 1
+      fi
+      install -m 0755 "$binary" "$out/bin/github-mcp-server"
+      runHook postInstall
+    '';
+    meta = {
+      description = "Official GitHub MCP server with GitHub App authentication";
+      homepage = "https://github.com/github/github-mcp-server";
+      platforms = [ "x86_64-linux" ];
+      mainProgram = "github-mcp-server";
+    };
+  };
   mcpEntry = builtins.toJSON {
     command = "${pkgs.socat}/bin/socat";
     args = [ "STDIO" "UNIX-CONNECT:${socketPath}" ];
@@ -51,7 +83,7 @@ in {
       EnvironmentFile = "/etc/agentic/github-app/app.env";
       LoadCredential = "github-app.pem:/etc/agentic/github-app/private-key.pem";
       Environment = [ "GITHUB_APP_PRIVATE_KEY_PATH=%d/github-app.pem" ];
-      ExecStart = "${pkgs.github-mcp-server}/bin/github-mcp-server stdio";
+      ExecStart = "${githubMcpServer}/bin/github-mcp-server stdio";
       StandardInput = "socket";
       StandardOutput = "inherit";
       StandardError = "journal";

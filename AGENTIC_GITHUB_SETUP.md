@@ -64,13 +64,17 @@ After completing credential setup in section 6, run this **read-only** audit on 
 bash scripts/check-github-protection.sh
 ```
 
+The audit prints **✅ for every passing check**, **⚠️ for warnings** (such as missing CI), and **❌ for blocking failures**, with a summary and nonzero exit status if any blocking check fails.
+
 The Bash script requires `curl`, `jq`, `openssl`, `base64`, and standard macOS command-line utilities. It uses your GitHub App ID, installation ID and selected PEM from `secrets/github-app/`. It creates a short-lived installation token **in memory**, lists **every repository accessible to this App installation** (including paginated results), and checks the active GitHub branch rules for `main` and `agentic` in each repository. No permanent token is saved; no rulesets are changed.
 
-It checks for required PRs, at least one required approval on `main`, configured CI checks, protection against force pushes, and protection against branch deletion. It reports missing branches, API errors and missing checks. An exit code of `0` means all *machine-checkable* requirements passed; a nonzero exit means attention is needed or the audit could not complete.
+The audit checks **squash-only merging independently on `main` and `agentic`**, using each branch’s effective `pull_request` ruleset parameters (`allowed_merge_methods: ["squash"]`). Configure **Allowed merge methods → Squash** in the ruleset targeting each branch. There is **no requirement to disable merge or rebase methods repository-wide**. If GitHub does not expose the rule’s allowed methods, the audit reports a blocking failure rather than claiming compliance.
+
+It checks for required PRs, at least one required approval on `main`, protection against force pushes, and protection against branch deletion. It also prints **required/available CI checks** for each branch (for example `1/2` or `2/2`). “Available” means distinct check runs and commit status contexts observed on the branch’s **current tip commit**; “required” is the number of those observed contexts selected by effective branch rules. `2/2` counts as a pass; `1/2` and `0/0` are warnings, not blocking failures. Checks that only run on PRs may not appear on a branch tip, so this is a snapshot, not a complete CI inventory. Missing branches, required protection rules, and API errors still fail the audit. An exit code of `0` means no blocking findings were detected; **warnings can still be present**.
 
 **IMPORTANT:** An audit is not a substitute for enforcement. The script **does not create rulesets**, cannot prove which human is reviewing, and cannot always inspect ruleset bypass actors with the App's restricted permissions. Even a passing audit is **not proof** the App is unable to bypass restrictions. Manually verify that this App has no bypass rights for `main`, and test that it cannot directly push or merge into `main` without approvals.
 
-To fix missing protections: on GitHub, open the affected repository and navigate to **Settings → Rules → Rulesets → New branch ruleset**. Apply **Active** rulesets matching the audit's missing requirements. For `agentic`, use zero required approvals if agents should merge autonomously. Choose CI checks that actually exist. Re-run the audit after fixing them.
+To fix missing protections: on GitHub, open the affected repository and navigate to **Settings → Rules → Rulesets → New branch ruleset**. Apply **Active** rulesets matching the audit's missing requirements. For `agentic`, use zero required approvals if agents should merge autonomously. When CI workflows have run, select their status checks in each ruleset; the audit will stop warning about missing CI. Re-run the audit after fixing blocking findings.
 
 For GitHub API details see [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) and [installation repositories](https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation).
 
@@ -166,7 +170,7 @@ Reference: [GitHub MCP — GitHub App authentication](https://github.com/github/
 
 ## 9. Verify the real permissions
 
-Run `bash scripts/check-github-protection.sh` and resolve any warnings. Then test on a disposable branch and PR that the App can work on `agent/*`, merge passing PRs into `agentic`, **cannot push directly to `main` or `agentic`**, and cannot merge into `main` without the required human review. Confirm the App has no `main` ruleset bypass privileges in GitHub Settings.
+Run `bash scripts/check-github-protection.sh`. Resolve blocking failures before deployment; missing CI checks are warnings until CI is configured. Then test on a disposable branch and PR that the App can work on `agent/*`, merge passing PRs into `agentic`, **cannot push directly to `main` or `agentic`**, and cannot merge into `main` without the required human review. Confirm the App has no `main` ruleset bypass privileges in GitHub Settings.
 
 **Native rulesets cannot prevent an App with PR-write access from merely *opening* a PR targeting `main`.** The audit cannot change that limitation. The official MCP server also does not enforce a custom `agent/*` branch-prefix policy by itself.
 
