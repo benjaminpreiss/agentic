@@ -7,11 +7,20 @@ for f in flake.nix flake.lock generated/machine.nix generated/facter.json target
 done
 TARGET="${TARGET:-$(cat "$DEPLOY/target.txt")}"; HOST="${TARGET#*@}"
 [[ -n "$HOST" && "$HOST" != "$TARGET" ]] || { echo 'Expected user@host in target.txt' >&2; exit 1; }
-mkdir -p "$DEPLOY/profiles"
+# The Nix module reads these shell sources at evaluation time, so stage them
+# alongside the module. They contain code only; credentials never enter the flake.
+mkdir -p "$DEPLOY/scripts"
 for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix \
-  profiles/pi-herdr.json profiles/omp-agentic.json; do
+  scripts/git-app-token-broker.sh scripts/git-credential-helper.sh \
+  scripts/configure-git-credentials.sh; do
   [[ -f "$ROOT/$f" ]] || { echo "Missing $f" >&2; exit 1; }
   cp "$ROOT/$f" "$DEPLOY/$f"
+done
+# Local nono profiles are part of the flake source too.
+mkdir -p "$DEPLOY/profiles"
+for f in pi-herdr.json omp-agentic.json; do
+  [[ -f "$ROOT/profiles/$f" ]] || { echo "Missing profiles/$f" >&2; exit 1; }
+  cp "$ROOT/profiles/$f" "$DEPLOY/profiles/$f"
 done
 # Secrets are streamed directly over SSH, never placed beneath .deployment:
 # Nix may copy the entire evaluated flake source into the world-readable store.
@@ -42,7 +51,7 @@ sync_github_app_secrets() {
   [[ "$app_id" =~ ^[0-9]+$ && "$installation_id" =~ ^[0-9]+$ ]] || {
     echo 'Invalid GitHub App IDs in app.env' >&2; return 1;
   }
-  grep -q -- '-----BEGIN .*PRIVATE KEY-----' "$keyfile" || {
+  openssl pkey -in "$keyfile" -noout >/dev/null 2>&1 || {
     echo 'Invalid private key PEM' >&2; return 1;
   }
   echo "Uploading GitHub App credentials to root@$HOST over SSH..."
@@ -52,7 +61,7 @@ sync_github_app_secrets() {
       install -d -m 0700 -o root -g root /etc/agentic
       install -d -m 0700 -o root -g root /etc/agentic/github-app
       staging="$(mktemp -d /etc/agentic/.github-app.XXXXXXXX)"
-      trap '''rm -rf "$staging"''' EXIT
+      trap "rm -rf -- \"$staging\"" EXIT
       tar -xf - -C "$staging" --no-same-owner --no-same-permissions
       test -s "$staging/app.env"
       test -s "$staging/private-key.pem"
