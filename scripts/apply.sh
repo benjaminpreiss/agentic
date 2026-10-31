@@ -7,7 +7,12 @@ for f in flake.nix flake.lock generated/machine.nix generated/facter.json target
 done
 TARGET="${TARGET:-$(cat "$DEPLOY/target.txt")}"; HOST="${TARGET#*@}"
 [[ -n "$HOST" && "$HOST" != "$TARGET" ]] || { echo 'Expected user@host in target.txt' >&2; exit 1; }
-for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix; do
+# The Nix module reads these shell sources at evaluation time, so stage them
+# alongside the module. They contain code only; credentials never enter the flake.
+mkdir -p "$DEPLOY/scripts"
+for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix \
+  scripts/git-app-token-broker.sh scripts/git-credential-helper.sh \
+  scripts/configure-git-credentials.sh; do
   [[ -f "$ROOT/$f" ]] || { echo "Missing $f" >&2; exit 1; }
   cp "$ROOT/$f" "$DEPLOY/$f"
 done
