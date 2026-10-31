@@ -71,15 +71,44 @@ ok()   { printf '  ✅ %s\n' "$1"; ((passed+=1)); }
 warn() { printf '  ⚠️  %s\n' "$1"; ((warnings+=1)); }
 fail() { printf '  ❌ %s\n' "$1"; ((failures+=1)); }
 
-# The GitHub branch-rules API includes applicable rules from repository and
-# organization rulesets. It does not prove whether this App has bypass rights.
+# Effective branch rules include applicable repository and organization rulesets.
+# They do not identify bypass actors or prove who approved a PR. Inspect all
+# existing branches, not only the two conventional target branches.
 for repo in "${repos[@]}"; do
   [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'ERROR: invalid repository identifier' >&2; exit 2; }
   printf '\n📦 %s\n' "$repo"
 
-  for branch in main agentic; do
+  branches=()
+  listing_ok=true
+  page=1
+  while :; do
+    if ! api GET "$API/repos/$repo/branches?per_page=100&page=$page" "$token"; then
+      fail 'branch listing: API transport error'; listing_ok=false; break
+    elif [[ "$STATUS" != 200 ]]; then
+      fail "branch listing: HTTP $STATUS"; listing_ok=false; break
+    elif ! jq -e 'type=="array"' >/dev/null <<<"$BODY"; then
+      fail 'branch listing: invalid API response'; listing_ok=false; break
+    fi
+    while IFS= read -r name; do branches+=("$name"); done < <(jq -r '.[].name' <<<"$BODY")
+    count="$(jq 'length' <<<"$BODY")"
+    ((count < 100)) && break
+    ((page+=1))
+    if ((page > 50)); then fail 'branch listing: pagination limit exceeded'; listing_ok=false; break; fi
+  done
+  [[ "$listing_ok" == true ]] || continue
+  # Explicitly fail when either policy anchor is absent, even if the list is empty.
+  for anchor in main agentic; do
+    found=false
+    for name in "${branches[@]}"; do [[ "$name" != "$anchor" ]] || found=true; done
+    [[ "$found" == true ]] || fail "$anchor exists: branch not found"
+  done
+  for branch in "${branches[@]}"; do
     printf '  ── %s ──\n' "$branch"
-    if ! api GET "$API/repos/$repo/branches/$branch" "$token"; then
+    # GitHub branch names may contain slash, spaces, and other URL-significant
+    # characters. Encode the path segment rather than interpolating raw input.
+    encoded_branch="$(jq -rn --arg v "$branch" '$v|@uri')"
+    case "$branch" in agentic/*) autonomous=true ;; *) autonomous=false ;; esac
+    if ! api GET "$API/repos/$repo/branches/$encoded_branch" "$token"; then
       fail "$branch exists: API transport error"
       continue
     fi
@@ -93,7 +122,7 @@ for repo in "${repos[@]}"; do
     ok "$branch exists"
     branch_sha="$(jq -r '.commit.sha // empty' <<<"$BODY")"
 
-    if ! api GET "$API/repos/$repo/rules/branches/$branch?per_page=100" "$token"; then
+    if ! api GET "$API/repos/$repo/rules/branches/$encoded_branch?per_page=100" "$token"; then
       fail "$branch protection rules: API transport error"
       continue
     elif [[ "$STATUS" != 200 ]]; then
@@ -129,17 +158,22 @@ for repo in "${repos[@]}"; do
       fail "$branch squash-only merging: allowed methods missing or include merge/rebase"
     fi
 
-    if [[ "$branch" == main ]]; then
-      if jq -e '[.[] | select(.type=="pull_request") | (.parameters.required_approving_review_count // 0)] | any(.>=1)' >/dev/null <<<"$BODY"; then
-        ok 'main requires at least one PR approval'
+    if [[ "$autonomous" == true ]]; then
+      if jq -e 'any(.[]; .type=="pull_request" and (.parameters.required_approving_review_count // 0) > 0)' >/dev/null <<<"$BODY"; then
+        warn "$branch requires approvals (autonomous merges may be blocked)"
       else
-        fail 'main requires at least one PR approval'
+        ok "$branch permits zero-approval PR merges"
       fi
     else
-      if jq -e '[.[] | select(.type=="pull_request") | (.parameters.required_approving_review_count // 0)] | any(.>0)' >/dev/null <<<"$BODY"; then
-        fail 'agentic requires approvals (autonomous merges need zero)'
+      if jq -e 'any(.[]; .type=="pull_request" and (.parameters.required_approving_review_count // 0) >= 1)' >/dev/null <<<"$BODY"; then
+        ok "$branch requires at least one PR approval"
       else
-        ok 'agentic permits zero-approval PR merges'
+        fail "$branch requires at least one PR approval"
+      fi
+      if jq -e 'any(.[]; .type=="pull_request" and .parameters.dismiss_stale_reviews_on_push == true)' >/dev/null <<<"$BODY"; then
+        ok "$branch dismisses stale approvals after new commits"
+      else
+        fail "$branch must dismiss stale approvals after new commits"
       fi
     fi
 
@@ -220,7 +254,7 @@ for repo in "${repos[@]}"; do
       fi
     fi
   done
-  warn 'Ruleset bypass permissions and actual push/merge behavior cannot be verified by this audit'
+  warn 'Cannot verify App bypass permissions, reviewer identity, merge authorization, or future branch coverage with effective branch rules; test with App credentials and restrict merge access via a trusted service'
 done
 unset token
 printf '\nSummary: ✅ %s passed  ⚠️ %s warnings  ❌ %s failures (%s repositories)\n' "$passed" "$warnings" "$failures" "${#repos[@]}"
