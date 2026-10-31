@@ -114,27 +114,9 @@ in {
         ln -s ${skillsSource} /home/agentic/.pi/agent/skills/mattpocock
       fi
       # Registry state directories are owned by agentic via tmpfiles below.
-      # This service creates local profiles; it never touches nono packs.
-      cat > /home/agentic/.config/nono/profiles/pi-herdr.json <<'PROFILE'
-      {
-        "extends": "nolabs-ai/pi",
-        "meta": {"name": "pi-herdr", "version": "1.0.1"},
-        "workdir": {"access": "readwrite"},
-        "filesystem": {"allow": ["$HOME/work"], "read": ["$HOME/.pi/agent/skills"]}
-      }
-      PROFILE
-      chown agentic:users /home/agentic/.config/nono/profiles/pi-herdr.json
-      chmod 0600 /home/agentic/.config/nono/profiles/pi-herdr.json
-      cat > /home/agentic/.config/nono/profiles/omp-agentic.json <<'PROFILE'
-      {
-        "extends": "nolabs-ai/omp",
-        "meta": {"name": "omp-agentic", "version": "1.0.0"},
-        "workdir": {"access": "readwrite"},
-        "filesystem": {"allow": ["$HOME/work"]}
-      }
-      PROFILE
-      chown agentic:users /home/agentic/.config/nono/profiles/omp-agentic.json
-      chmod 0600 /home/agentic/.config/nono/profiles/omp-agentic.json
+      # Only install local profiles here; packs are pulled by apply.sh.
+      install -o agentic -g users -m 0600 ${../profiles/pi-herdr.json} /home/agentic/.config/nono/profiles/pi-herdr.json
+      install -o agentic -g users -m 0600 ${../profiles/omp-agentic.json} /home/agentic/.config/nono/profiles/omp-agentic.json
     '';
   };
   # Automatic update checks, rather than unreviewed live configuration swaps.

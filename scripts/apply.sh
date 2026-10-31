@@ -7,7 +7,9 @@ for f in flake.nix flake.lock generated/machine.nix generated/facter.json target
 done
 TARGET="${TARGET:-$(cat "$DEPLOY/target.txt")}"; HOST="${TARGET#*@}"
 [[ -n "$HOST" && "$HOST" != "$TARGET" ]] || { echo 'Expected user@host in target.txt' >&2; exit 1; }
-for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix; do
+mkdir -p "$DEPLOY/profiles"
+for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix \
+  profiles/pi-herdr.json profiles/omp-agentic.json; do
   [[ -f "$ROOT/$f" ]] || { echo "Missing $f" >&2; exit 1; }
   cp "$ROOT/$f" "$DEPLOY/$f"
 done
