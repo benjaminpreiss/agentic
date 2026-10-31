@@ -1,0 +1,75 @@
+name: GitHub protection audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - github-protection/**
+      - .github/workflows/github-protection-audit.yml
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  policy-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate script and policy without credentials
+        run: |
+          bash -n github-protection/check.sh
+          bash -n github-protection/test.sh
+          bash github-protection/test.sh
+
+  audit:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Audit every repository in the configured App installation
+        env:
+          APP_ID: ${{ secrets.AGENTIC_APP_ID }}
+          INSTALL_ID: ${{ secrets.AGENTIC_INSTALLATION_ID }}
+          PRIVATE_KEY: ${{ secrets.AGENTIC_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$APP_ID" && -n "$INSTALL_ID" && -n "$PRIVATE_KEY" ]] || {
+            echo 'ERROR: missing App audit secrets'; exit 2;
+          }
+          dir="$(mktemp -d "$RUNNER_TEMP/agentic-github-audit.XXXXXXXX")"
+          trap 'rm -rf "$dir"' EXIT
+          chmod 700 "$dir"
+          printf 'GITHUB_APP_ID=%s\nGITHUB_APP_INSTALLATION_ID=%s\n' "$APP_ID" "$INSTALL_ID" > "$dir/app.env"
+          printf '%s\n' "$PRIVATE_KEY" > "$dir/private-key.pem"
+          chmod 600 "$dir"/*
+          AGENTIC_GITHUB_SECRETS_DIR="$dir" bash github-protection/check.sh
+
+  notify:
+    needs: audit
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.audit.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update audit alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='GitHub protection audit failed'
+          issue="$(gh issue list --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+          body="Audit failed or could not run. Inspect the [workflow run]($RUN_URL). No credentials are included in this alert."
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

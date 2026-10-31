@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SECRETS="$ROOT/secrets/github-app"
+SECRETS="${AGENTIC_GITHUB_SECRETS_DIR:-$ROOT/secrets/github-app}"
 API=https://api.github.com
 for cmd in curl jq openssl date base64; do command -v "$cmd" >/dev/null || { echo "ERROR: missing $cmd" >&2; exit 2; }; done
 [[ -r "$SECRETS/app.env" ]] || { echo 'ERROR: missing secrets/github-app/app.env' >&2; exit 2; }
@@ -20,7 +20,7 @@ INSTALL_ID="$(read_setting GITHUB_APP_INSTALLATION_ID)"
 [[ "$APP_ID" =~ ^[0-9]+$ && "$INSTALL_ID" =~ ^[0-9]+$ ]] || { echo 'ERROR: expected numeric GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID' >&2; exit 2; }
 KEY="$SECRETS/private-key.pem"
 [[ -f "$KEY" && -r "$KEY" ]] || { echo 'ERROR: missing active private-key.pem' >&2; exit 2; }
-# Symlink must resolve to a file inside the secrets directory; reject escapes.
+# Symlink must resolve to a file inside the selected secrets directory; reject escapes.
 REAL_KEY="$(cd -P "$(dirname "$KEY")" && realpath "$KEY")"
 REAL_DIR="$(cd -P "$SECRETS" && pwd)"
 case "$REAL_KEY" in "$REAL_DIR"/*) ;; *) echo 'ERROR: active key must resolve inside secrets/github-app' >&2; exit 2;; esac
@@ -71,15 +71,41 @@ ok()   { printf '  ✅ %s\n' "$1"; ((passed+=1)); }
 warn() { printf '  ⚠️  %s\n' "$1"; ((warnings+=1)); }
 fail() { printf '  ❌ %s\n' "$1"; ((failures+=1)); }
 
-# The GitHub branch-rules API includes applicable rules from repository and
-# organization rulesets. It does not prove whether this App has bypass rights.
+# Effective branch rules include applicable repository and organization rulesets.
+# They do not identify bypass actors or prove who approved a PR. Inspect all
+# existing branches, not only the two conventional target branches.
 for repo in "${repos[@]}"; do
   [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'ERROR: invalid repository identifier' >&2; exit 2; }
   printf '\n📦 %s\n' "$repo"
 
-  for branch in main agentic; do
+  branches=()
+  listing_ok=true
+  page=1
+  while :; do
+    if ! api GET "$API/repos/$repo/branches?per_page=100&page=$page" "$token"; then
+      fail 'branch listing: API transport error'; listing_ok=false; break
+    elif [[ "$STATUS" != 200 ]]; then
+      fail "branch listing: HTTP $STATUS"; listing_ok=false; break
+    elif ! jq -e 'type=="array"' >/dev/null <<<"$BODY"; then
+      fail 'branch listing: invalid API response'; listing_ok=false; break
+    fi
+    while IFS= read -r name; do branches+=("$name"); done < <(jq -r '.[].name' <<<"$BODY")
+    count="$(jq 'length' <<<"$BODY")"
+    ((count < 100)) && break
+    ((page+=1))
+    if ((page > 50)); then fail 'branch listing: pagination limit exceeded'; listing_ok=false; break; fi
+  done
+  [[ "$listing_ok" == true ]] || continue
+  # main is the only required named target; agentic/* branches are optional.
+  found=false
+  for name in "${branches[@]}"; do [[ "$name" != main ]] || found=true; done
+  [[ "$found" == true ]] || fail 'main exists: branch not found'
+  for branch in "${branches[@]}"; do
     printf '  ── %s ──\n' "$branch"
-    if ! api GET "$API/repos/$repo/branches/$branch" "$token"; then
+    # GitHub branch names may contain slash, spaces, and other URL-significant
+    # characters. Encode the path segment rather than interpolating raw input.
+    encoded_branch="$(jq -rn --arg v "$branch" '$v|@uri')"
+    if ! api GET "$API/repos/$repo/branches/$encoded_branch" "$token"; then
       fail "$branch exists: API transport error"
       continue
     fi
@@ -93,7 +119,7 @@ for repo in "${repos[@]}"; do
     ok "$branch exists"
     branch_sha="$(jq -r '.commit.sha // empty' <<<"$BODY")"
 
-    if ! api GET "$API/repos/$repo/rules/branches/$branch?per_page=100" "$token"; then
+    if ! api GET "$API/repos/$repo/rules/branches/$encoded_branch?per_page=100" "$token"; then
       fail "$branch protection rules: API transport error"
       continue
     elif [[ "$STATUS" != 200 ]]; then
@@ -104,55 +130,23 @@ for repo in "${repos[@]}"; do
       continue
     fi
 
-    if jq -e 'any(.[]; .type=="pull_request")' >/dev/null <<<"$BODY"; then
-      ok "$branch requires a pull request"
-    else
-      fail "$branch requires a pull request"
+    # The policy evaluator owns branch-pattern decisions and ruleset checks;
+    # this script owns transport, CI inventory, and presentation.
+    if ! policy_results="$(jq -c --arg branch "$branch" -f "$ROOT/github-protection/policy.jq" <<<"$BODY")"; then
+      fail "$branch policy evaluation failed"
+      continue
     fi
-
-    # Squash-only is a property of the effective pull_request rule(s) for
-    # this branch, NOT a repository-wide restriction. Multiple applicable
-    # rules must all be restrictive; absent method data is unverifiable.
-    pr_rule_count="$(jq '[.[] | select(.type=="pull_request")] | length' <<<"$BODY")"
-    if ((pr_rule_count == 0)); then
-      fail "$branch squash-only merging: no pull-request rule"
-    elif jq -e '
-      [.[] | select(.type=="pull_request")] |
-      all(.[];
-        (.parameters.allowed_merge_methods | type) == "array" and
-        (.parameters.allowed_merge_methods | length) == 1 and
-        .parameters.allowed_merge_methods[0] == "squash"
-      )
-    ' >/dev/null <<<"$BODY"; then
-      ok "$branch allows squash merging only"
-    else
-      fail "$branch squash-only merging: allowed methods missing or include merge/rebase"
+    if ! jq -e 'type == "array" and length > 0 and all(.[]; (.status == "ok" or .status == "warn" or .status == "fail") and (.message | type == "string"))' >/dev/null <<<"$policy_results"; then
+      fail "$branch policy evaluator returned invalid results"
+      continue
     fi
-
-    if [[ "$branch" == main ]]; then
-      if jq -e '[.[] | select(.type=="pull_request") | (.parameters.required_approving_review_count // 0)] | any(.>=1)' >/dev/null <<<"$BODY"; then
-        ok 'main requires at least one PR approval'
-      else
-        fail 'main requires at least one PR approval'
-      fi
-    else
-      if jq -e '[.[] | select(.type=="pull_request") | (.parameters.required_approving_review_count // 0)] | any(.>0)' >/dev/null <<<"$BODY"; then
-        fail 'agentic requires approvals (autonomous merges need zero)'
-      else
-        ok 'agentic permits zero-approval PR merges'
-      fi
-    fi
-
-    if jq -e 'any(.[]; .type=="non_fast_forward")' >/dev/null <<<"$BODY"; then
-      ok "$branch blocks force pushes"
-    else
-      fail "$branch blocks force pushes"
-    fi
-    if jq -e 'any(.[]; .type=="deletion")' >/dev/null <<<"$BODY"; then
-      ok "$branch blocks deletion"
-    else
-      fail "$branch blocks deletion"
-    fi
+    while IFS=$'\t' read -r result message; do
+      case "$result" in
+        ok) ok "$branch $message" ;;
+        warn) warn "$branch $message" ;;
+        fail) fail "$branch $message" ;;
+      esac
+    done < <(jq -r '.[] | [.status, .message] | @tsv' <<<"$policy_results")
     # CI coverage: selected required contexts / distinct contexts observed on
     # the branch tip (check-runs plus commit statuses). This is NOT a complete
     # inventory of all workflows that could run on future pull requests.
@@ -220,7 +214,7 @@ for repo in "${repos[@]}"; do
       fi
     fi
   done
-  warn 'Ruleset bypass permissions and actual push/merge behavior cannot be verified by this audit'
+  warn 'Cannot verify App bypass permissions, reviewer identity, merge authorization, or future branch coverage with effective branch rules; test with App credentials and restrict merge access via a trusted service'
 done
 unset token
 printf '\nSummary: ✅ %s passed  ⚠️ %s warnings  ❌ %s failures (%s repositories)\n' "$passed" "$warnings" "$failures" "${#repos[@]}"
