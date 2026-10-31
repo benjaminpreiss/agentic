@@ -1,6 +1,6 @@
 # Agentic — GitHub App setup
 
-This guide sets up **GitHub's official MCP server** for the NixOS coding VPS, with GitHub App credentials supplied from your Mac. Pi runs inside nono; the MCP server and its credentials run outside the sandbox.
+This guide sets up **GitHub's official MCP server** and a **Git HTTPS credential helper** for the NixOS coding VPS, with GitHub App credentials supplied from your Mac. Pi runs inside nono; the MCP server and token broker keep the App private key outside the sandbox. Git receives a short-lived, repository-scoped installation token when pushing.
 
 **Goal:** agents work on `agent/*` branches, open and merge passing PRs into `agentic`, while humans review changes before merging into `main`.
 
@@ -164,13 +164,24 @@ Credential-file permissions should be `600 root:root`. Do not print the private 
 
 Then test **inside Pi** that the GitHub MCP tools are available and can read the selected repository. **A running socket alone does not prove Pi's MCP connection works.** Check the Pi MCP adapter and transport separately if tools are missing.
 
+Git pushes use a separate socket, `/run/agentic-git-credentials.sock`, and the `agentic-git-credential` helper configured for the HTTPS URL `https://github.com/benjaminpreiss/agentic.git`. The broker signs a fresh JWT using its systemd-loaded PEM and requests an installation token restricted to the `agentic` repository with Contents write; it never stores the token. Git receives the short-lived token through its credential protocol, so code running as the agent can use that token while it remains valid. The helper refuses other hosts, protocols and repository paths. Do not print credentials with `git credential fill`, enable Git credential tracing, or put tokens in remote URLs.
+
+Check the credential-helper service and socket from an administrative shell (do not print its credentials):
+
+```bash
+systemctl status agentic-git-credentials.socket agentic-configure-git-credentials.service --no-pager
+git config --global --get-all credential.https://github.com/benjaminpreiss/agentic.git.helper
+```
+
+The second command should be run as `agentic`; it prints only helper paths, not tokens. The checkout must use the HTTPS remote above. Verify inside `nnpi` that nono permits HTTPS to `github.com:443` (for example, `nono why --self --host github.com --port 443`); the token socket grant alone does not allow Git's network connection. Push a disposable `agent/*` branch to confirm the complete path. If you push a workflow file, GitHub may require an additional Workflows permission; this App deliberately has none.
+
 The official GitHub MCP server authenticates GitHub Apps in **`stdio` mode**, signs JWTs, and refreshes short-lived installation tokens itself. Its `http` mode does not provide the same built-in App-auth flow. Therefore the installed bridge must carry actual MCP messages between Pi and the stdio server, not merely expose a socket path.
 
 Reference: [GitHub MCP — GitHub App authentication](https://github.com/github/github-mcp-server/blob/main/docs/github-app-auth.md).
 
 ## 9. Verify the real permissions
 
-Run `bash scripts/check-github-protection.sh`. Resolve blocking failures before deployment; missing CI checks are warnings until CI is configured. Then test on a disposable branch and PR that the App can work on `agent/*`, merge passing PRs into `agentic`, **cannot push directly to `main` or `agentic`**, and cannot merge into `main` without the required human review. Confirm the App has no `main` ruleset bypass privileges in GitHub Settings.
+Run `bash scripts/check-github-protection.sh`. Resolve blocking failures before deployment; missing CI checks are warnings until CI is configured. Then test a real `git push` on a disposable `agent/*` branch and a PR: the App should merge passing PRs into `agentic`, **cannot push directly to `main` or `agentic`**, and cannot merge into `main` without the required human review. Confirm the App has no `main` ruleset bypass privileges in GitHub Settings.
 
 **Native rulesets cannot prevent an App with PR-write access from merely *opening* a PR targeting `main`.** The audit cannot change that limitation. The official MCP server also does not enforce a custom `agent/*` branch-prefix policy by itself.
 
@@ -181,6 +192,8 @@ ssh windcloud-vps-xl-ic3ht09rza
 cd ~/work
 nnpi
 ```
+
+From a checkout with the HTTPS `origin`, start from `agentic`, create an `agent/*` branch, commit locally, and run `git push -u origin HEAD`. The scoped Git credential helper supplies a fresh installation token for the push; no manual token export is needed. Open the PR into `agentic` with MCP. Neither the helper nor the broker limits which branch you push: GitHub rulesets must enforce the protected branches.
 
 Example agent instruction:
 
