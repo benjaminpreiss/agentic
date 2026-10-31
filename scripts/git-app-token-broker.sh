@@ -49,5 +49,8 @@ response="$(curl --silent --show-error --max-time 30 --request POST \
   "https://api.github.com/app/installations/$installation_id/access_tokens")" || fail 'token request transport failed'
 [[ "${response##*$'\n'}" == 201 ]] || fail "token request HTTP ${response##*$'\n'}"
 body="${response%$'\n'*}"
-token="$(jq -er '.token | select(type == "string" and test("^[A-Za-z0-9_]+$"))' <<<"$body" 2>/dev/null)" || fail 'token response missing valid token'
+# Tokens are opaque: GitHub may change their punctuation. The socket and Git
+# credential protocol are line-based, so reject whitespace/control characters
+# rather than guessing a token alphabet. Never log a token or response body.
+token="$(jq -er '.token | select(type == "string" and test("^[!-~]+$"))' <<<"$body" 2>/dev/null)" || fail 'token response missing printable ASCII token'
 printf '%s\n' "$token"
