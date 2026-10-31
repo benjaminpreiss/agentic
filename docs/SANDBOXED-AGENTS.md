@@ -1,6 +1,6 @@
 # Sandboxed Pi and Oh My Pi
 
-The NixOS setup installs **`pi` and `omp` as sandbox launchers**. There is no separate `nnpi` or `nomp` command to remember.
+The NixOS setup installs **`pi` and `omp` as sandbox launchers**.
 
 ## Use
 
