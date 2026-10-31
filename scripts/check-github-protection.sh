@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SECRETS="$ROOT/secrets/github-app"
+SECRETS="${AGENTIC_GITHUB_SECRETS_DIR:-$ROOT/secrets/github-app}"
 API=https://api.github.com
 for cmd in curl jq openssl date base64; do command -v "$cmd" >/dev/null || { echo "ERROR: missing $cmd" >&2; exit 2; }; done
 [[ -r "$SECRETS/app.env" ]] || { echo 'ERROR: missing secrets/github-app/app.env' >&2; exit 2; }
@@ -20,7 +20,7 @@ INSTALL_ID="$(read_setting GITHUB_APP_INSTALLATION_ID)"
 [[ "$APP_ID" =~ ^[0-9]+$ && "$INSTALL_ID" =~ ^[0-9]+$ ]] || { echo 'ERROR: expected numeric GITHUB_APP_ID and GITHUB_APP_INSTALLATION_ID' >&2; exit 2; }
 KEY="$SECRETS/private-key.pem"
 [[ -f "$KEY" && -r "$KEY" ]] || { echo 'ERROR: missing active private-key.pem' >&2; exit 2; }
-# Symlink must resolve to a file inside the secrets directory; reject escapes.
+# Symlink must resolve to a file inside the selected secrets directory; reject escapes.
 REAL_KEY="$(cd -P "$(dirname "$KEY")" && realpath "$KEY")"
 REAL_DIR="$(cd -P "$SECRETS" && pwd)"
 case "$REAL_KEY" in "$REAL_DIR"/*) ;; *) echo 'ERROR: active key must resolve inside secrets/github-app' >&2; exit 2;; esac
@@ -105,7 +105,6 @@ for repo in "${repos[@]}"; do
     # GitHub branch names may contain slash, spaces, and other URL-significant
     # characters. Encode the path segment rather than interpolating raw input.
     encoded_branch="$(jq -rn --arg v "$branch" '$v|@uri')"
-    case "$branch" in agentic/*) autonomous=true ;; *) autonomous=false ;; esac
     if ! api GET "$API/repos/$repo/branches/$encoded_branch" "$token"; then
       fail "$branch exists: API transport error"
       continue
@@ -131,60 +130,23 @@ for repo in "${repos[@]}"; do
       continue
     fi
 
-    if jq -e 'any(.[]; .type=="pull_request")' >/dev/null <<<"$BODY"; then
-      ok "$branch requires a pull request"
-    else
-      fail "$branch requires a pull request"
+    # The policy evaluator owns branch-pattern decisions and ruleset checks;
+    # this script owns transport, CI inventory, and presentation.
+    if ! policy_results="$(jq -c --arg branch "$branch" -f "$ROOT/scripts/github-protection-policy.jq" <<<"$BODY")"; then
+      fail "$branch policy evaluation failed"
+      continue
     fi
-
-    # Squash-only is a property of the effective pull_request rule(s) for
-    # this branch, NOT a repository-wide restriction. Multiple applicable
-    # rules must all be restrictive; absent method data is unverifiable.
-    pr_rule_count="$(jq '[.[] | select(.type=="pull_request")] | length' <<<"$BODY")"
-    if ((pr_rule_count == 0)); then
-      fail "$branch squash-only merging: no pull-request rule"
-    elif jq -e '
-      [.[] | select(.type=="pull_request")] |
-      all(.[];
-        (.parameters.allowed_merge_methods | type) == "array" and
-        (.parameters.allowed_merge_methods | length) == 1 and
-        .parameters.allowed_merge_methods[0] == "squash"
-      )
-    ' >/dev/null <<<"$BODY"; then
-      ok "$branch allows squash merging only"
-    else
-      fail "$branch squash-only merging: allowed methods missing or include merge/rebase"
+    if ! jq -e 'type == "array" and length > 0 and all(.[]; (.status == "ok" or .status == "warn" or .status == "fail") and (.message | type == "string"))' >/dev/null <<<"$policy_results"; then
+      fail "$branch policy evaluator returned invalid results"
+      continue
     fi
-
-    if [[ "$autonomous" == true ]]; then
-      if jq -e 'any(.[]; .type=="pull_request" and (.parameters.required_approving_review_count // 0) > 0)' >/dev/null <<<"$BODY"; then
-        warn "$branch requires approvals (autonomous merges may be blocked)"
-      else
-        ok "$branch permits zero-approval PR merges"
-      fi
-    else
-      if jq -e 'any(.[]; .type=="pull_request" and (.parameters.required_approving_review_count // 0) >= 1)' >/dev/null <<<"$BODY"; then
-        ok "$branch requires at least one PR approval"
-      else
-        fail "$branch requires at least one PR approval"
-      fi
-      if jq -e 'any(.[]; .type=="pull_request" and .parameters.dismiss_stale_reviews_on_push == true)' >/dev/null <<<"$BODY"; then
-        ok "$branch dismisses stale approvals after new commits"
-      else
-        fail "$branch must dismiss stale approvals after new commits"
-      fi
-    fi
-
-    if jq -e 'any(.[]; .type=="non_fast_forward")' >/dev/null <<<"$BODY"; then
-      ok "$branch blocks force pushes"
-    else
-      fail "$branch blocks force pushes"
-    fi
-    if jq -e 'any(.[]; .type=="deletion")' >/dev/null <<<"$BODY"; then
-      ok "$branch blocks deletion"
-    else
-      fail "$branch blocks deletion"
-    fi
+    while IFS=$'\t' read -r result message; do
+      case "$result" in
+        ok) ok "$branch $message" ;;
+        warn) warn "$branch $message" ;;
+        fail) fail "$branch $message" ;;
+      esac
+    done < <(jq -r '.[] | [.status, .message] | @tsv' <<<"$policy_results")
     # CI coverage: selected required contexts / distinct contexts observed on
     # the branch tip (check-runs plus commit statuses). This is NOT a complete
     # inventory of all workflows that could run on future pull requests.
