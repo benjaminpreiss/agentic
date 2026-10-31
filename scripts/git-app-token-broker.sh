@@ -11,7 +11,9 @@ key="${CREDENTIALS_DIRECTORY:?}/github-app.pem"
 
 b64url() { base64 | tr -d '\r\n' | tr '+/' '-_' | tr -d '='; }
 now="$(date +%s)"
-header='eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9'
+# JWT headers are a protocol constant, not a repository or App setting.
+# GitHub Apps sign JWTs with RS256 (RSA/SHA-256).
+header="$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)"
 payload="$(jq -cn --argjson iat "$((now-60))" --argjson exp "$((now+540))" --arg iss "$GITHUB_APP_ID" '{iat:$iat,exp:$exp,iss:$iss}' | b64url)"
 unsigned="$header.$payload"
 signature="$(printf %s "$unsigned" | openssl dgst -sha256 -sign "$key" | b64url)"

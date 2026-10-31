@@ -164,6 +164,39 @@ Credential-file permissions should be `600 root:root`. Do not print the private 
 
 Then test **inside Pi** that the GitHub MCP tools are available and can read the selected repository. **A running socket alone does not prove Pi's MCP connection works.** Check the Pi MCP adapter and transport separately if tools are missing.
 
+### Authentication architecture
+
+```text
+                         ONE-TIME SETUP (outside nono)
+ agentic-configure-git-credentials.service (as agentic)
+   └─ scripts/configure-git-credentials.sh → ~/.gitconfig
+      (registers the GitHub HTTPS helper; stores no token)
+
+ Pi / Git / helper (inside nono, runs as agentic)
+   git push → Git's credential request → scripts/git-credential-helper.sh
+                                            │ owner/repo (no PEM)
+========================= socket / nono seam ===========================
+                                            ▼
+ /run/agentic-git-credentials.sock (systemd, mode 0600, owner agentic)
+   └─ Accept=true: spawn one agentic-git-credentials@<instance>.service
+      per connection, then exit. Stateless; no resident token cache.
+      └─ scripts/git-app-token-broker.sh (outside nono, DynamicUser)
+         App ID from app.env + private PEM via systemd LoadCredential
+         → sign RS256 JWT → find this App's installation for owner/repo
+         → GitHub: mint token scoped to that repo, Contents write only
+                                            │ short-lived token (never PEM)
+========================= socket / nono seam ===========================
+                                            ▼
+   helper → Git credential response → Git HTTPS push to github.com
+
+ Separate path: Pi → /run/agentic-github-mcp.sock → per-connection
+   agentic-github-mcp@<instance>.service (outside nono; App credentials)
+   → GitHub MCP operations such as PRs and issues. MCP currently uses
+   the single installation ID from app.env.
+```
+
+The per-connection broker instance keeps the root-owned PEM out of Pi's sandbox: Git's helper cannot run the signer directly without access to that key. One instance per request is a simple stateless choice, not a GitHub requirement; a long-running broker could instead handle connections and cache tokens. The socket's host permissions restrict who can connect, but **any process with socket access can request a Contents-write token** for any repository where this App is installed. The helper is not the socket's only possible caller. GitHub rulesets must protect branches; the broker does not enforce branch names. When pathname socket mediation is disabled in nono, `--allow-unix-socket` is not itself an enforced restriction.
+
 Git pushes use a separate socket, `/run/agentic-git-credentials.sock`, and the `agentic-git-credential` helper configured for HTTPS `github.com` remotes. The helper sends the requested `owner/repository` to the broker. The broker signs a fresh JWT using its systemd-loaded PEM, discovers **this App's installation for that repository**, then requests an installation token restricted to that repository with Contents write. GitHub rejects requests for repositories without that App installation or sufficient permissions. Neither key nor token is stored by the broker. Code running as `agentic` can use a minted token while it remains valid; the socket also lets that user request tokens for any repository where the App is installed. Only GitHub HTTPS remotes are supported (not SSH or GitHub Enterprise). Multiple installations of the **same** App work; multiple different GitHub Apps and private keys at once do not. The existing MCP process still uses the single installation ID in `app.env` and may not have access to other installations. Do not print credentials with `git credential fill`, enable Git credential tracing, or put tokens in remote URLs.
 
 Check the credential-helper service and socket from an administrative shell (do not print its credentials):
