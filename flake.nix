@@ -5,6 +5,7 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     pi.url = "github:earendil-works/pi/stable";
+    omp.url = "github:can1357/oh-my-pi";
     nono.url = "github:nolabs-ai/nono";
     herdr.url = "github:herdrdev/herdr";
     matt-skills = { url = "github:mattpocock/skills"; flake = false; };

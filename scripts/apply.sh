@@ -94,10 +94,13 @@ if ! printf '%s\n' "$installed" | grep -Fq 'nolabs-ai/pi'; then
 fi
 # The pull is intentionally performed under the actual agent identity.
 runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin "$nono" pull nolabs-ai/pi
+runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin "$nono" pull nolabs-ai/omp
 runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin "$nono" list --installed
 runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin sh -c \
   'cd /home/agentic/work && exec nono run --profile pi-herdr --allow-cwd --dry-run -- /run/current-system/sw/bin/true' >/dev/null
-echo 'nono package and pi-herdr profile verified.'
+runuser -u agentic -- env HOME="$home" PATH=/run/current-system/sw/bin:/usr/bin:/bin sh -c \
+  'cd /home/agentic/work && exec nono run --profile omp-agentic --allow-cwd --dry-run -- /run/current-system/sw/bin/true' >/dev/null
+echo 'nono packages and pi-herdr/omp-agentic profiles verified.'
 REMOTE
 then
   echo 'Apply completed, including nono verification.'
