@@ -3,6 +3,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 POLICY="$ROOT/github-protection/policy.jq"
+# The workflow invokes this test without credentials; validate sourced modules too.
+for script in check.sh github-api.sh ci.sh; do
+  bash -n "$ROOT/github-protection/$script"
+done
 
 check() {
   local branch="$1" rules="$2" expected="$3" results actual
