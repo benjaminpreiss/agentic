@@ -33,6 +33,24 @@ let
       mainProgram = "github-mcp-server";
     };
   };
+  gitSocketPath = "/run/agentic-git-credentials.sock";
+  # This process runs outside nono. Only a per-repository installation token,
+  # never the PEM, crosses the socket into Git. One App may have many installations.
+  gitTokenBroker = pkgs.writeShellApplication {
+    name = "agentic-git-token-broker";
+    runtimeInputs = [ pkgs.coreutils pkgs.jq pkgs.openssl pkgs.curl ];
+    text = builtins.readFile ../scripts/git-app-token-broker.sh;
+  };
+  gitCredentialHelper = pkgs.writeShellApplication {
+    name = "agentic-git-credential";
+    runtimeInputs = [ pkgs.socat ];
+    text = builtins.readFile ../scripts/git-credential-helper.sh;
+  };
+  configureGitCredentials = pkgs.writeShellApplication {
+    name = "agentic-configure-git-credentials";
+    runtimeInputs = [ pkgs.git ];
+    text = builtins.readFile ../scripts/configure-git-credentials.sh;
+  };
   mcpEntry = builtins.toJSON {
     command = "${pkgs.socat}/bin/socat";
     args = [ "STDIO" "UNIX-CONNECT:${socketPath}" ];
@@ -98,6 +116,56 @@ in {
       LockPersonality = true;
       CapabilityBoundingSet = "";
       RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    };
+  };
+  # A separate, agentic-only socket serves Git's HTTPS credential helper.
+  # No App key or long-lived credential is available inside nono.
+  systemd.sockets.agentic-git-credentials = {
+    description = "GitHub App installation tokens for agentic Git pushes";
+    wantedBy = [ "sockets.target" ];
+    socketConfig = {
+      ListenStream = gitSocketPath;
+      Accept = true;
+      SocketUser = "agentic";
+      SocketGroup = "users";
+      SocketMode = "0600";
+      RemoveOnStop = true;
+    };
+  };
+  systemd.services."agentic-git-credentials@" = {
+    description = "Mint a scoped GitHub App token for one Git credential request";
+    serviceConfig = {
+      Type = "simple";
+      DynamicUser = true;
+      EnvironmentFile = "/etc/agentic/github-app/app.env";
+      LoadCredential = "github-app.pem:/etc/agentic/github-app/private-key.pem";
+      ExecStart = "${gitTokenBroker}/bin/agentic-git-token-broker";
+      StandardInput = "socket";
+      StandardOutput = "inherit";
+      StandardError = "journal";
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectControlGroups = true;
+      RestrictSUIDSGID = true;
+      LockPersonality = true;
+      CapabilityBoundingSet = "";
+      RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    };
+  };
+  systemd.services.agentic-configure-git-credentials = {
+    description = "Configure agentic Git credential helper for GitHub HTTPS repositories";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-tmpfiles-setup.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      User = "agentic";
+      Group = "users";
+      Environment = "HOME=/home/agentic";
+      ExecStart = "${configureGitCredentials}/bin/agentic-configure-git-credentials ${gitCredentialHelper}/bin/agentic-git-credential ${gitSocketPath}";
     };
   };
   # Merge only the github MCP entry; do not replace unrelated servers.
