@@ -40,7 +40,7 @@ sync_github_app_secrets() {
   # Reject links outside the secrets directory, including dangling links.
   local resolved_dir resolved_key
   resolved_dir="$(cd "$secrets" && pwd -P)"
-  resolved_key="$(realpath -e "$keyfile")" || return 1
+  resolved_key="$(realpath "$keyfile")" || return 1
   case "$resolved_key" in
     "$resolved_dir"/*) ;;
     *) echo 'private-key.pem must point to a PEM within secrets/github-app/' >&2; return 1 ;;
