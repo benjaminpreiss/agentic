@@ -1,0 +1,7 @@
+# Sandboxed agent commands
+
+After applying the NixOS configuration with `scripts/apply.sh`, run `cd ~/work && pi` or `cd ~/work && omp`. These are the default system commands, not optional `nnpi`/`nomp` aliases. Both fail closed outside `~/work`, forward arguments to their respective agents, and run through nono. Raw agent packages are referenced only by Nix store paths inside the wrappers, not installed on the system `PATH`. The interactive Zsh configuration puts the wrappers ahead of `~/.local/bin` as well. An explicit Nix store path can still bypass this convention; this does not constitute a system-wide execution prohibition.
+
+`pi` uses the `pi-herdr` profile inherited from `nolabs-ai/pi` and has the GitHub MCP socket. `omp` uses `omp-agentic` inherited from `nolabs-ai/omp` and has the Git credential socket for Git pushes, but not the GitHub MCP socket. The GitHub App private key stays outside the sandbox. Provider login and OMP settings are not provisioned automatically; OMP and Pi maintain separate configurations.
+
+The apply script pulls both nono packs as `agentic` and runs a dry-run check of both profiles. A failed pull or check stops verification; it does not launch either agent unsandboxed. Before deploying, refresh the generated `.deployment/flake.lock` on your deployment machine to include the new OMP flake input (for example, `cd .deployment && nix flake lock --update-input omp`), and inspect the resulting lock changes. This PR has not been evaluated on a generated machine configuration or exercised against a live OMP pack.
