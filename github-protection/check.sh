@@ -7,13 +7,13 @@ umask 077
 [[ $# == 0 || ($# == 1 && $1 == --all-branches) ]] || { echo 'Usage: bash github-protection/check.sh [--all-branches]' >&2; exit 2; }
 all_branches=false
 [[ $# == 0 ]] || all_branches=true
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SECRETS="${AGENTIC_GITHUB_SECRETS_DIR:-$ROOT/secrets/github-app}"
+POLICY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SECRETS="${AGENTIC_GITHUB_SECRETS_DIR:-$POLICY_DIR/../secrets/github-app}"
 for cmd in curl jq openssl date base64; do command -v "$cmd" >/dev/null || { echo "ERROR: missing $cmd" >&2; exit 2; }; done
 # Sourced modules define functions only. They require the main script's
 # api response globals (BODY/STATUS) and reporting functions (ok/warn/fail).
-source "$ROOT/github-protection/github-api.sh"
-source "$ROOT/github-protection/ci.sh"
+source "$POLICY_DIR/github-api.sh"
+source "$POLICY_DIR/ci.sh"
 
 failures=0; warnings=0; passed=0
 ok()   { printf '  ✅ %s\n' "$1"; ((passed+=1)); }
@@ -45,7 +45,7 @@ check_effective() {
     fail "$branch: invalid effective rules response"; return 1
   fi
   EFFECTIVE_RULES="$BODY"
-  if ! results="$(jq -c --arg branch "$branch" -f "$ROOT/github-protection/policy.jq" <<<"$EFFECTIVE_RULES")"; then
+  if ! results="$(jq -c --arg branch "$branch" -f "$POLICY_DIR/policy.jq" <<<"$EFFECTIVE_RULES")"; then
     fail "$branch: policy evaluation failed"; return 1
   fi
   report "$branch" "$results"
@@ -56,7 +56,7 @@ audit_repo() {
   [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'ERROR: invalid repository identifier' >&2; exit 2; }
   printf '\n📦 %s\n' "$repo"
   if load_rulesets "$repo"; then
-    if results="$(jq -c --argjson app_id "$APP_ID" -f "$ROOT/github-protection/rulesets.jq" <<<"$details")"; then
+    if results="$(jq -c --argjson app_id "$APP_ID" -f "$POLICY_DIR/rulesets.jq" <<<"$details")"; then
       report 'rulesets' "$results" || true
     else fail 'ruleset policy evaluation failed'; fi
   fi
