@@ -3,7 +3,7 @@ set -euo pipefail
 [[ "${2:-}" == get ]] || exit 0
 socket="${1:?missing token broker socket}"
 
-protocol= host= path=
+protocol='' host='' path=''
 while IFS= read -r line && [[ -n "$line" ]]; do
   case "$line" in
     protocol=*) protocol="${line#protocol=}" ;;
