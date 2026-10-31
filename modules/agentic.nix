@@ -19,6 +19,7 @@ let
       esac
       exec ${nonoPkg}/bin/nono run --profile pi-herdr --allow-cwd \
         --allow-unix-socket /run/agentic-github-mcp.sock \
+        --allow-unix-socket /run/agentic-git-credentials.sock \
         -- ${piPkg}/bin/pi "$@"
     '';
   };
@@ -125,7 +126,7 @@ in {
     "d /home/agentic/.config/nono/profile-drafts 0700 agentic users - -"
     "d /var/backups/agentic 0700 root root - -"
   ];
-  # Prevent zsh-newuser-install. This creates only the startup file if absent;
+  # Prevent zsh-newuser-install. This creates the startup file only if absent;
   # the global interactive configuration below remains declarative.
   system.userActivationScripts.agenticZshrc = ''
     if [ -d /home/agentic ]; then
