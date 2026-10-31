@@ -65,38 +65,163 @@ while :; do
 done
 printf 'GitHub App installation %s: %s repositories\nRead-only audit; no GitHub settings are changed.\n\n' "$INSTALL_ID" "${#repos[@]}"
 failures=0
+warnings=0
+passed=0
+ok()   { printf '  ✅ %s\n' "$1"; ((passed+=1)); }
+warn() { printf '  ⚠️  %s\n' "$1"; ((warnings+=1)); }
+fail() { printf '  ❌ %s\n' "$1"; ((failures+=1)); }
+
+# The GitHub branch-rules API includes applicable rules from repository and
+# organization rulesets. It does not prove whether this App has bypass rights.
 for repo in "${repos[@]}"; do
-  [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "ERROR: invalid repository identifier" >&2; exit 2; }
-  echo "$repo"
+  [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'ERROR: invalid repository identifier' >&2; exit 2; }
+  printf '\n📦 %s\n' "$repo"
+
   for branch in main agentic; do
-    api GET "$API/repos/$repo/branches/$branch" "$token" || { echo "  $branch: UNKNOWN (transport error)"; ((failures+=1)); continue; }
-    if [[ "$STATUS" == 404 ]]; then echo "  $branch: NOT FOUND"; ((failures+=1)); continue; fi
-    if [[ "$STATUS" != 200 ]]; then echo "  $branch: UNKNOWN (branch HTTP $STATUS)"; ((failures+=1)); continue; fi
-    api GET "$API/repos/$repo/rules/branches/$branch?per_page=100" "$token" || { echo "  $branch: UNKNOWN (rules transport error)"; ((failures+=1)); continue; }
-    if [[ "$STATUS" != 200 ]]; then echo "  $branch: UNKNOWN (rules HTTP $STATUS)"; ((failures+=1)); continue; fi
-    if ! jq -e 'type=="array"' >/dev/null <<<"$BODY"; then echo "  $branch: UNKNOWN (invalid rules)"; ((failures+=1)); continue; fi
-    issues=()
-    for spec in 'pull_request:require a pull request' 'required_status_checks:require CI checks' 'non_fast_forward:block force pushes' 'deletion:block deletion'; do
-      typ="${spec%%:*}"; label="${spec#*:}"
-      jq -e --arg t "$typ" 'any(.[]; .type==$t)' >/dev/null <<<"$BODY" || issues+=("MISSING: $label")
-    done
-    if [[ "$branch" == main ]]; then
-      jq -e '[.[]|select(.type=="pull_request")|(.parameters.required_approving_review_count // 0)]|any(.>=1)' >/dev/null <<<"$BODY" || issues+=('MISSING: at least one required PR approval')
-    else
-      jq -e '[.[]|select(.type=="pull_request")|(.parameters.required_approving_review_count // 0)]|any(.>0)' >/dev/null <<<"$BODY" && issues+=('REVIEW: approval required on agentic may prevent autonomous merges')
+    printf '  ── %s ──\n' "$branch"
+    if ! api GET "$API/repos/$repo/branches/$branch" "$token"; then
+      fail "$branch exists: API transport error"
+      continue
     fi
-    jq -e '[.[]|select(.type=="required_status_checks")|(.parameters.required_status_checks // [])]|any(length>0)' >/dev/null <<<"$BODY" || issues+=('MISSING: selected required CI checks')
-    if ((${#issues[@]})); then
-      echo "  $branch: NEEDS ATTENTION"
-      printf '    - %s\n' "${issues[@]}"
-      ((failures+=1))
+    if [[ "$STATUS" == 404 ]]; then
+      fail "$branch exists: branch not found"
+      continue
+    elif [[ "$STATUS" != 200 ]]; then
+      fail "$branch exists: HTTP $STATUS"
+      continue
+    fi
+    ok "$branch exists"
+    branch_sha="$(jq -r '.commit.sha // empty' <<<"$BODY")"
+
+    if ! api GET "$API/repos/$repo/rules/branches/$branch?per_page=100" "$token"; then
+      fail "$branch protection rules: API transport error"
+      continue
+    elif [[ "$STATUS" != 200 ]]; then
+      fail "$branch protection rules: HTTP $STATUS"
+      continue
+    elif ! jq -e 'type=="array"' >/dev/null <<<"$BODY"; then
+      fail "$branch protection rules: invalid API response"
+      continue
+    fi
+
+    if jq -e 'any(.[]; .type=="pull_request")' >/dev/null <<<"$BODY"; then
+      ok "$branch requires a pull request"
     else
-      echo "  $branch: rule checks present (bypass actors NOT verified)"
+      fail "$branch requires a pull request"
+    fi
+
+    # Squash-only is a property of the effective pull_request rule(s) for
+    # this branch, NOT a repository-wide restriction. Multiple applicable
+    # rules must all be restrictive; absent method data is unverifiable.
+    pr_rule_count="$(jq '[.[] | select(.type=="pull_request")] | length' <<<"$BODY")"
+    if ((pr_rule_count == 0)); then
+      fail "$branch squash-only merging: no pull-request rule"
+    elif jq -e '
+      [.[] | select(.type=="pull_request")] |
+      all(.[];
+        (.parameters.allowed_merge_methods | type) == "array" and
+        (.parameters.allowed_merge_methods | length) == 1 and
+        .parameters.allowed_merge_methods[0] == "squash"
+      )
+    ' >/dev/null <<<"$BODY"; then
+      ok "$branch allows squash merging only"
+    else
+      fail "$branch squash-only merging: allowed methods missing or include merge/rebase"
+    fi
+
+    if [[ "$branch" == main ]]; then
+      if jq -e '[.[] | select(.type=="pull_request") | (.parameters.required_approving_review_count // 0)] | any(.>=1)' >/dev/null <<<"$BODY"; then
+        ok 'main requires at least one PR approval'
+      else
+        fail 'main requires at least one PR approval'
+      fi
+    else
+      if jq -e '[.[] | select(.type=="pull_request") | (.parameters.required_approving_review_count // 0)] | any(.>0)' >/dev/null <<<"$BODY"; then
+        fail 'agentic requires approvals (autonomous merges need zero)'
+      else
+        ok 'agentic permits zero-approval PR merges'
+      fi
+    fi
+
+    if jq -e 'any(.[]; .type=="non_fast_forward")' >/dev/null <<<"$BODY"; then
+      ok "$branch blocks force pushes"
+    else
+      fail "$branch blocks force pushes"
+    fi
+    if jq -e 'any(.[]; .type=="deletion")' >/dev/null <<<"$BODY"; then
+      ok "$branch blocks deletion"
+    else
+      fail "$branch blocks deletion"
+    fi
+    # CI coverage: selected required contexts / distinct contexts observed on
+    # the branch tip (check-runs plus commit statuses). This is NOT a complete
+    # inventory of all workflows that could run on future pull requests.
+    required_names="$(jq -c '[.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[]? | (.context // empty)] | unique' <<<"$BODY")"
+    required_count="$(jq 'length' <<<"$required_names")"
+    available_names='[]'
+    ci_error=''
+    if [[ ! "$branch_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+      ci_error='branch tip SHA was not available'
+    else
+      # GitHub Check Runs API: first 100 check runs per page, paginated.
+      page=1
+      while :; do
+        if ! api GET "$API/repos/$repo/commits/$branch_sha/check-runs?per_page=100&page=$page" "$token"; then
+          ci_error='check-runs request failed'; break
+        elif [[ "$STATUS" != 200 ]]; then
+          ci_error="check-runs HTTP $STATUS"; break
+        elif ! jq -e '.check_runs | type == "array"' >/dev/null <<<"$BODY"; then
+          ci_error='invalid check-runs response'; break
+        fi
+        names="$(jq -c '[.check_runs[].name | select(type=="string")] | unique' <<<"$BODY")"
+        available_names="$(jq -cn --argjson a "$available_names" --argjson b "$names" '$a + $b | unique')"
+        count="$(jq '.check_runs | length' <<<"$BODY")"
+        ((count < 100)) && break
+        ((page+=1))
+        if ((page > 50)); then ci_error='check-runs pagination limit exceeded'; break; fi
+      done
+      # Classic commit status contexts are separate from check runs.
+      if [[ -z "$ci_error" ]]; then
+        page=1
+        while :; do
+          if ! api GET "$API/repos/$repo/commits/$branch_sha/statuses?per_page=100&page=$page" "$token"; then
+            ci_error='commit statuses request failed'; break
+          elif [[ "$STATUS" != 200 ]]; then
+            ci_error="commit statuses HTTP $STATUS"; break
+          elif ! jq -e 'type=="array"' >/dev/null <<<"$BODY"; then
+            ci_error='invalid commit statuses response'; break
+          fi
+          names="$(jq -c '[.[].context | select(type=="string")] | unique' <<<"$BODY")"
+          available_names="$(jq -cn --argjson a "$available_names" --argjson b "$names" '$a + $b | unique')"
+          count="$(jq 'length' <<<"$BODY")"
+          ((count < 100)) && break
+          ((page+=1))
+          if ((page > 50)); then ci_error='commit statuses pagination limit exceeded'; break; fi
+        done
+      fi
+    fi
+    if [[ -n "$ci_error" ]]; then
+      warn "$branch CI coverage: unavailable ($ci_error; $required_count required)"
+    else
+      available_count="$(jq 'length' <<<"$available_names")"
+      # Display how many observed checks are selected as required; an existing
+      # required rule referring to an absent check must not count as coverage.
+      covered_count="$(jq -cn --argjson a "$available_names" --argjson r "$required_names" '[$a[] | select(. as $x | $r | index($x) != null)] | length')"
+      if ((available_count > 0 && covered_count == available_count)); then
+        ok "$branch CI checks required/available: $covered_count/$available_count"
+      else
+        warn "$branch CI checks required/available: $covered_count/$available_count"
+      fi
+      # Required contexts not present on the branch tip are not reflected in
+      # the numerator, so report them explicitly rather than silently passing.
+      unobserved="$(jq -cn --argjson a "$available_names" --argjson r "$required_names" '[$r[] | select(. as $x | $a | index($x) == null)] | join(", ")')"
+      if [[ -n "$unobserved" ]]; then
+        warn "$branch required CI contexts not observed on tip: $unobserved"
+      fi
     fi
   done
-  echo
+  warn 'Ruleset bypass permissions and actual push/merge behavior cannot be verified by this audit'
 done
 unset token
-printf 'NOT VERIFIED: ruleset bypass actors, reviewer identity, or real push/merge behavior.\n'
-printf 'Finished: %s repository(s), %s branch(es) needing attention.\n' "${#repos[@]}" "$failures"
+printf '\nSummary: ✅ %s passed  ⚠️ %s warnings  ❌ %s failures (%s repositories)\n' "$passed" "$warnings" "$failures" "${#repos[@]}"
 ((failures == 0))

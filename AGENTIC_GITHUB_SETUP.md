@@ -1,6 +1,6 @@
 # Agentic — GitHub App setup
 
-This guide sets up **GitHub's official MCP server** for the NixOS coding VPS, with GitHub App credentials supplied from your Mac. Pi runs inside nono; the MCP server and its credentials run outside the sandbox.
+This guide sets up **GitHub's official MCP server** and a **Git HTTPS credential helper** for the NixOS coding VPS, with GitHub App credentials supplied from your Mac. Pi runs inside nono; the MCP server and token broker keep the App private key outside the sandbox. Git receives a short-lived token scoped to the repository being pushed. The Git helper supports repositories on `github.com` where this **one GitHub App** is installed, including multiple installations of the same App; simultaneous use of multiple different GitHub Apps is not supported.
 
 **Goal:** agents work on `agent/*` branches, open and merge passing PRs into `agentic`, while humans review changes before merging into `main`.
 
@@ -56,7 +56,7 @@ agent/fix-123 ── PR + passing CI ──> agentic ── reviewed PR + passin
 agent/feature ── PR + passing CI ──> agentic
 ```
 
-## 4. Audit branch protection for every installed repository
+## 4. Audit branch protection for the configured installation
 
 After completing credential setup in section 6, run this **read-only** audit on your Mac from the project root:
 
@@ -64,13 +64,17 @@ After completing credential setup in section 6, run this **read-only** audit on 
 bash scripts/check-github-protection.sh
 ```
 
-The Bash script requires `curl`, `jq`, `openssl`, `base64`, and standard macOS command-line utilities. It uses your GitHub App ID, installation ID and selected PEM from `secrets/github-app/`. It creates a short-lived installation token **in memory**, lists **every repository accessible to this App installation** (including paginated results), and checks the active GitHub branch rules for `main` and `agentic` in each repository. No permanent token is saved; no rulesets are changed.
+The audit prints **✅ for every passing check**, **⚠️ for warnings** (such as missing CI), and **❌ for blocking failures**, with a summary and nonzero exit status if any blocking check fails.
 
-It checks for required PRs, at least one required approval on `main`, configured CI checks, protection against force pushes, and protection against branch deletion. It reports missing branches, API errors and missing checks. An exit code of `0` means all *machine-checkable* requirements passed; a nonzero exit means attention is needed or the audit could not complete.
+The Bash script requires `curl`, `jq`, `openssl`, `base64`, and standard macOS command-line utilities. It uses your GitHub App ID, installation ID and selected PEM from `secrets/github-app/`. It creates a short-lived installation token **in memory**, lists **every repository accessible to the configured installation** (including paginated results), and checks the active GitHub branch rules for `main` and `agentic` in each repository. The audit does not cover other installations of the same App; audit and protect those repositories separately. No permanent token is saved; no rulesets are changed.
+
+The audit checks **squash-only merging independently on `main` and `agentic`**, using each branch’s effective `pull_request` ruleset parameters (`allowed_merge_methods: ["squash"]`). Configure **Allowed merge methods → Squash** in the ruleset targeting each branch. There is **no requirement to disable merge or rebase methods repository-wide**. If GitHub does not expose the rule’s allowed methods, the audit reports a blocking failure rather than claiming compliance.
+
+It checks for required PRs, at least one required approval on `main`, protection against force pushes, and protection against branch deletion. It also prints **required/available CI checks** for each branch (for example `1/2` or `2/2`). “Available” means distinct check runs and commit status contexts observed on the branch’s **current tip commit**; “required” is the number of those observed contexts selected by effective branch rules. `2/2` counts as a pass; `1/2` and `0/0` are warnings, not blocking failures. Checks that only run on PRs may not appear on a branch tip, so this is a snapshot, not a complete CI inventory. Missing branches, required protection rules, and API errors still fail the audit. An exit code of `0` means no blocking findings were detected; **warnings can still be present**.
 
 **IMPORTANT:** An audit is not a substitute for enforcement. The script **does not create rulesets**, cannot prove which human is reviewing, and cannot always inspect ruleset bypass actors with the App's restricted permissions. Even a passing audit is **not proof** the App is unable to bypass restrictions. Manually verify that this App has no bypass rights for `main`, and test that it cannot directly push or merge into `main` without approvals.
 
-To fix missing protections: on GitHub, open the affected repository and navigate to **Settings → Rules → Rulesets → New branch ruleset**. Apply **Active** rulesets matching the audit's missing requirements. For `agentic`, use zero required approvals if agents should merge autonomously. Choose CI checks that actually exist. Re-run the audit after fixing them.
+To fix missing protections: on GitHub, open the affected repository and navigate to **Settings → Rules → Rulesets → New branch ruleset**. Apply **Active** rulesets matching the audit's missing requirements. For `agentic`, use zero required approvals if agents should merge autonomously. When CI workflows have run, select their status checks in each ruleset; the audit will stop warning about missing CI. Re-run the audit after fixing blocking findings.
 
 For GitHub API details see [active branch rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch) and [installation repositories](https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation).
 
@@ -160,13 +164,79 @@ Credential-file permissions should be `600 root:root`. Do not print the private 
 
 Then test **inside Pi** that the GitHub MCP tools are available and can read the selected repository. **A running socket alone does not prove Pi's MCP connection works.** Check the Pi MCP adapter and transport separately if tools are missing.
 
+### Authentication architecture
+
+```text
+====================== BEGIN AGENTIC VPS ======================
+
+	+------------- Pi / nono sandbox (uid agentic) ----------+
+	| Pi: Git -> credential helper -> owner/repo request      |
+	|     Git -> HTTPS push with returned token              |
+	|     MCP client -> GitHub MCP socket                    |
+	+--------------------------------------------------------+
+	          | token request / response; MCP messages
+	---------- nono / host process seam ----------------------
+
+	HOST SYSTEMD (outside nono)
+		+---------------------------+  +---------------------------+
+		| Git credentials socket    |  | GitHub MCP socket         |
+		| /run/agentic-git-         |  | /run/agentic-github-      |
+		| credentials.sock (0600)   |  | mcp.sock (0600)           |
+		+-------------+-------------+  +-------------+-------------+
+		              | Accept=true                 | Accept=true
+		              | one instance per connection | same
+		+-------------v-------------+  +-------------v-------------+
+		| agentic-git-credentials@0 |  | agentic-github-mcp@0      |
+		| broker: one request       |  | stdio; PR/issue tools     |
+		+---------------------------+  +---------------------------+
+		+---------------------------+  +---------------------------+
+		| agentic-git-credentials@1 |  | agentic-github-mcp@1      |
+		| another connection        |  | another connection        |
+		+---------------------------+  +---------------------------+
+
+		+------------------ credentials ------------------------+
+		| root-owned App PEM -> systemd LoadCredential ->      |
+		| service instances only; PEM never enters nono       |
+		| app.env: App ID; MCP uses one installation ID       |
+		| Git broker: JWT -> lookup -> per-repo token          |
+		+-------------------------------------------------------+
+
+		+------------------ one-shot setup ---------------------+
+		| agentic-configure-git-credentials.service           |
+		| -> configure-git-credentials.sh -> ~/.gitconfig      |
+		|    (registers helper; stores no token)              |
+		+-------------------------------------------------------+
+
+======================= END AGENTIC VPS =======================
+	| Git HTTPS from Pi; GitHub API from broker/MCP instances
+	v
++---------------------- GitHub (remote) -----------------------+
+| App installation permissions + repo rulesets limit actions. |
++--------------------------------------------------------------+
+```
+
+Each `@` box is an instance of its corresponding `.service` template, created for one connection, not a separate GitHub App. The two columns are independent: Git receives a Contents-write token, while MCP uses its own App authentication for PRs and issues. The token crosses into nono for Git; the private key does not.
+
+The per-connection broker instance keeps the root-owned PEM out of Pi's sandbox: Git's helper cannot run the signer directly without access to that key. One instance per request is a simple stateless choice, not a GitHub requirement; a long-running broker could instead handle connections and cache tokens. The socket's host permissions restrict who can connect, but **any process with socket access can request a Contents-write token** for any repository where this App is installed. The helper is not the socket's only possible caller. GitHub rulesets must protect branches; the broker does not enforce branch names. When pathname socket mediation is disabled in nono, `--allow-unix-socket` is not itself an enforced restriction.
+
+Git pushes use a separate socket, `/run/agentic-git-credentials.sock`, and the `agentic-git-credential` helper configured for HTTPS `github.com` remotes. The helper sends the requested `owner/repository` to the broker. The broker signs a fresh JWT using its systemd-loaded PEM, discovers **this App's installation for that repository**, then requests an installation token restricted to that repository with Contents write. GitHub rejects requests for repositories without that App installation or sufficient permissions. Neither key nor token is stored by the broker. Code running as `agentic` can use a minted token while it remains valid; the socket also lets that user request tokens for any repository where the App is installed. Only GitHub HTTPS remotes are supported (not SSH or GitHub Enterprise). Multiple installations of the **same** App work; multiple different GitHub Apps and private keys at once do not. The existing MCP process still uses the single installation ID in `app.env` and may not have access to other installations. Do not print credentials with `git credential fill`, enable Git credential tracing, or put tokens in remote URLs.
+
+Check the credential-helper service and socket from an administrative shell (do not print its credentials):
+
+```bash
+systemctl status agentic-git-credentials.socket agentic-configure-git-credentials.service --no-pager
+git config --global --get-all credential.https://github.com.helper
+```
+
+The second command should be run as `agentic`; it prints only helper paths and the socket path, not tokens. Each checkout must use a GitHub HTTPS remote, and the App must be installed on that repository with Contents write permission. Verify inside `nnpi` that nono permits HTTPS to `github.com:443` (for example, `nono why --self --host github.com --port 443`); the token socket grant alone does not allow Git's network connection. Push a disposable `agent/*` branch to confirm the complete path. If you push a workflow file, GitHub may require an additional Workflows permission; this App deliberately has none.
+
 The official GitHub MCP server authenticates GitHub Apps in **`stdio` mode**, signs JWTs, and refreshes short-lived installation tokens itself. Its `http` mode does not provide the same built-in App-auth flow. Therefore the installed bridge must carry actual MCP messages between Pi and the stdio server, not merely expose a socket path.
 
 Reference: [GitHub MCP — GitHub App authentication](https://github.com/github/github-mcp-server/blob/main/docs/github-app-auth.md).
 
 ## 9. Verify the real permissions
 
-Run `bash scripts/check-github-protection.sh` and resolve any warnings. Then test on a disposable branch and PR that the App can work on `agent/*`, merge passing PRs into `agentic`, **cannot push directly to `main` or `agentic`**, and cannot merge into `main` without the required human review. Confirm the App has no `main` ruleset bypass privileges in GitHub Settings.
+Run `bash scripts/check-github-protection.sh`. Resolve blocking failures before deployment; missing CI checks are warnings until CI is configured. Then test a real `git push` on a disposable `agent/*` branch and a PR: the App should merge passing PRs into `agentic`, **cannot push directly to `main` or `agentic`**, and cannot merge into `main` without the required human review. Confirm the App has no `main` ruleset bypass privileges in GitHub Settings.
 
 **Native rulesets cannot prevent an App with PR-write access from merely *opening* a PR targeting `main`.** The audit cannot change that limitation. The official MCP server also does not enforce a custom `agent/*` branch-prefix policy by itself.
 
@@ -177,6 +247,8 @@ ssh windcloud-vps-xl-ic3ht09rza
 cd ~/work
 nnpi
 ```
+
+From a checkout with a GitHub HTTPS `origin` where this App is installed, start from the appropriate base branch, create a work branch, commit locally, and run `git push -u origin HEAD`. The Git credential helper supplies a fresh token scoped to that repository; no manual token export is needed. For this repo, open the PR into `agentic` with MCP. Neither the helper nor the broker limits which branch you push: configure GitHub rulesets for protected branches in **each** installed repository.
 
 Example agent instruction:
 
