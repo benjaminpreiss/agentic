@@ -2,7 +2,7 @@
 # Offline policy tests: no GitHub credentials or network access required.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-POLICY="$ROOT/scripts/github-protection-policy.jq"
+POLICY="$ROOT/github-protection/policy.jq"
 
 check() {
   local branch="$1" rules="$2" expected="$3" results actual

@@ -132,7 +132,7 @@ for repo in "${repos[@]}"; do
 
     # The policy evaluator owns branch-pattern decisions and ruleset checks;
     # this script owns transport, CI inventory, and presentation.
-    if ! policy_results="$(jq -c --arg branch "$branch" -f "$ROOT/scripts/github-protection-policy.jq" <<<"$BODY")"; then
+    if ! policy_results="$(jq -c --arg branch "$branch" -f "$ROOT/github-protection/policy.jq" <<<"$BODY")"; then
       fail "$branch policy evaluation failed"
       continue
     fi
