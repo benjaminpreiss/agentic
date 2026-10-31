@@ -11,9 +11,12 @@ while IFS= read -r line && [[ -n "$line" ]]; do
     path=*) path="${line#path=}" ;;
   esac
 done
-# Fail closed for other repositories, protocols, or hosts.
-[[ "$protocol" == https && "$host" == github.com && "$path" == benjaminpreiss/agentic.git ]] || exit 0
+# Only GitHub HTTPS repository URLs are eligible. The broker independently
+# validates the repository and checks that this App is installed on it.
+[[ "$protocol" == https && "$host" == github.com ]] || exit 0
+path="${path%.git}"
+[[ "$path" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$ ]] || exit 0
 
-token="$(printf 'token\n' | socat - "UNIX-CONNECT:$socket")" || exit 1
+token="$(printf '%s\n' "$path" | socat - "UNIX-CONNECT:$socket")" || exit 1
 [[ "$token" =~ ^[A-Za-z0-9_]+$ ]] || exit 1
 printf 'username=x-access-token\npassword=%s\n\n' "$token"

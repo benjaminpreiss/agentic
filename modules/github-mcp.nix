@@ -34,8 +34,8 @@ let
     };
   };
   gitSocketPath = "/run/agentic-git-credentials.sock";
-  # This process runs outside nono. Only the installation token, never the PEM,
-  # crosses the socket into Git. Request the minimum permissions for git push.
+  # This process runs outside nono. Only a per-repository installation token,
+  # never the PEM, crosses the socket into Git. One App may have many installations.
   gitTokenBroker = pkgs.writeShellApplication {
     name = "agentic-git-token-broker";
     runtimeInputs = [ pkgs.coreutils pkgs.jq pkgs.openssl pkgs.curl ];
@@ -157,7 +157,7 @@ in {
     };
   };
   systemd.services.agentic-configure-git-credentials = {
-    description = "Configure agentic Git credential helper for this repository";
+    description = "Configure agentic Git credential helper for GitHub HTTPS repositories";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-tmpfiles-setup.service" ];
     serviceConfig = {
