@@ -2,12 +2,13 @@
 let
   system = pkgs.stdenv.hostPlatform.system;
   piPkg = inputs.pi.packages.${system}.default;
+  ompPkg = inputs.omp.packages.${system}.default;
   nonoPkg = inputs.nono.packages.${system}.prebuilt;
   herdrPkg = inputs.herdr.packages.${system}.default;
   skillsSource = inputs.matt-skills;
-  nnpi = pkgs.writeShellApplication {
-    name = "nnpi";
-    runtimeInputs = [ pkgs.coreutils piPkg nonoPkg herdrPkg ];
+  sandboxedPi = pkgs.writeShellApplication {
+    name = "pi";
+    runtimeInputs = [ pkgs.coreutils nonoPkg herdrPkg ];
     text = ''
       export HERDR_AGENT=pi
       export JITI_FS_CACHE=false
@@ -15,12 +16,27 @@ let
       current="$(realpath -e "$PWD")"
       case "$current/" in
         "$work_root/"*) ;;
-        *) echo "nnpi: work inside ~/work; run: cd ~/work" >&2; exit 2 ;;
+        *) echo "pi: work inside ~/work; run: cd ~/work" >&2; exit 2 ;;
       esac
       exec ${nonoPkg}/bin/nono run --profile pi-herdr --allow-cwd \
         --allow-unix-socket /run/agentic-github-mcp.sock \
         --allow-unix-socket /run/agentic-git-credentials.sock \
         -- ${piPkg}/bin/pi "$@"
+    '';
+  };
+  sandboxedOmp = pkgs.writeShellApplication {
+    name = "omp";
+    runtimeInputs = [ pkgs.coreutils nonoPkg ];
+    text = ''
+      work_root="$(realpath -e "$HOME/work")"
+      current="$(realpath -e "$PWD")"
+      case "$current/" in
+        "$work_root/"*) ;;
+        *) echo "omp: work inside ~/work; run: cd ~/work" >&2; exit 2 ;;
+      esac
+      exec ${nonoPkg}/bin/nono run --profile omp-agentic --allow-cwd \
+        --allow-unix-socket /run/agentic-git-credentials.sock \
+        -- ${ompPkg}/bin/omp "$@"
     '';
   };
   tcpPorts = config.networking.firewall.allowedTCPPorts;
@@ -30,10 +46,11 @@ let
     echo 'AGENTIC WORKSPACE'
     echo '  Workspace: ~/work'
     echo '  Switch:    cd ~/work'
-    echo '  Start Pi:  nnpi'
+    echo '  Start Pi:  pi'
+    echo '  Start OMP: omp'
     echo
     echo 'AVAILABLE TOOLS'
-    for tool in nnpi pi nono herdr git node npm; do
+    for tool in pi omp nono herdr git node npm; do
       if command -v "$tool" >/dev/null 2>&1; then
         printf '  %-10s %s\n' "$tool" "$(command -v "$tool")"
       fi
@@ -51,7 +68,8 @@ let
     echo
     echo 'QUICK COMMANDS'
     echo '  cd ~/work           Enter sandbox workspace'
-    echo '  nnpi                Start sandboxed Pi'
+    echo '  pi                  Start sandboxed Pi'
+    echo '  omp                 Start sandboxed Oh My Pi'
     echo '  Ctrl+R              Search command history'
     echo '  Tab                 Autocomplete'
   '';
@@ -77,12 +95,14 @@ let
 
 in {
   imports = [ ./github-mcp.nix ];
-  environment.systemPackages = [ nnpi status backup pkgs.ghostty.terminfo piPkg nonoPkg herdrPkg ];
+  # Do not expose the raw agent packages on the system PATH: command discovery
+  # must find the sandbox launchers, not an unsandboxed binary.
+  environment.systemPackages = [ sandboxedPi sandboxedOmp status backup pkgs.ghostty.terminfo nonoPkg herdrPkg ];
 
   # Pi discovers recursively under ~/.pi/agent/skills. Install skills via
   # a read-only symlink to the pinned flake source; never mutate the Nix store.
   systemd.services.agentic-skills = {
-    description = "Install global Pi skills and agentic nono profile";
+    description = "Install global Pi skills and agentic nono profiles";
     wantedBy = [ "multi-user.target" ];
     after = [ "local-fs.target" ];
     serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
@@ -95,17 +115,9 @@ in {
         ln -s ${skillsSource} /home/agentic/.pi/agent/skills/mattpocock
       fi
       # Registry state directories are owned by agentic via tmpfiles below.
-      # This service only creates the Pi profile; it never touches nono packs.
-      cat > /home/agentic/.config/nono/profiles/pi-herdr.json <<'PROFILE'
-      {
-        "extends": "nolabs-ai/pi",
-        "meta": {"name": "pi-herdr", "version": "1.0.1"},
-        "workdir": {"access": "readwrite"},
-        "filesystem": {"allow": ["$HOME/work"], "read": ["$HOME/.pi/agent/skills"]}
-      }
-      PROFILE
-      chown agentic:users /home/agentic/.config/nono/profiles/pi-herdr.json
-      chmod 0600 /home/agentic/.config/nono/profiles/pi-herdr.json
+      # Only install local profiles here; packs are pulled by apply.sh.
+      install -o agentic -g users -m 0600 ${../profiles/pi-herdr.json} /home/agentic/.config/nono/profiles/pi-herdr.json
+      install -o agentic -g users -m 0600 ${../profiles/omp-agentic.json} /home/agentic/.config/nono/profiles/omp-agentic.json
     '';
   };
   # Automatic update checks, rather than unreviewed live configuration swaps.
@@ -141,7 +153,9 @@ in {
     eval "$(${pkgs.starship}/bin/starship init zsh)"
   '';
   programs.zsh.interactiveShellInit = ''
-    export PATH="$HOME/.local/bin:$PATH"
+    # Agent launchers take precedence even if a user installed raw binaries
+    # under ~/.local/bin. Other user tools remain available there.
+    export PATH="${sandboxedPi}/bin:${sandboxedOmp}/bin:$HOME/.local/bin:$PATH"
     # Existing systems may lack the Ghostty definition. Keep a safe fallback.
     if [[ "$TERM" == xterm-ghostty ]] && ! ${pkgs.ncurses}/bin/infocmp xterm-ghostty >/dev/null 2>&1; then
       export TERM=xterm-256color

@@ -1,0 +1,6 @@
+{
+  "extends": "nolabs-ai/omp",
+  "meta": {"name": "omp-agentic", "version": "1.0.0"},
+  "workdir": {"access": "readwrite"},
+  "filesystem": {"allow": ["$HOME/work"]}
+}
