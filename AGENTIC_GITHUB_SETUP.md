@@ -167,33 +167,52 @@ Then test **inside Pi** that the GitHub MCP tools are available and can read the
 ### Authentication architecture
 
 ```text
-                         ONE-TIME SETUP (outside nono)
- agentic-configure-git-credentials.service (as agentic)
-   └─ scripts/configure-git-credentials.sh → ~/.gitconfig
-      (registers the GitHub HTTPS helper; stores no token)
-
- Pi / Git / helper (inside nono, runs as agentic)
-   git push → Git's credential request → scripts/git-credential-helper.sh
-                                            │ owner/repo (no PEM)
-========================= socket / nono seam ===========================
-                                            ▼
- /run/agentic-git-credentials.sock (systemd, mode 0600, owner agentic)
-   └─ Accept=true: spawn one agentic-git-credentials@<instance>.service
-      per connection, then exit. Stateless; no resident token cache.
-      └─ scripts/git-app-token-broker.sh (outside nono, DynamicUser)
-         App ID from app.env + private PEM via systemd LoadCredential
-         → sign RS256 JWT → find this App's installation for owner/repo
-         → GitHub: mint token scoped to that repo, Contents write only
-                                            │ short-lived token (never PEM)
-========================= socket / nono seam ===========================
-                                            ▼
-   helper → Git credential response → Git HTTPS push to github.com
-
- Separate path: Pi → /run/agentic-github-mcp.sock → per-connection
-   agentic-github-mcp@<instance>.service (outside nono; App credentials)
-   → GitHub MCP operations such as PRs and issues. MCP currently uses
-   the single installation ID from app.env.
++------------------------------- AGENTIC VPS ------------------------------+
+| +-------------------- nono sandbox (uid agentic) ----------------------+ |
+| | +----------+  credential get  +----------------------------------+ | |
+| | | Git      | ----------------> | git-credential-helper.sh         | | |
+| | | push     | <---------------- | returns short-lived token       | | |
+| | +----------+                   +---------------|------------------+ | |
+| |      | Git HTTPS push                     owner/repo | token          | |
+| | +---------------+                               |                 | |
+| | | Pi MCP client | ------------------------------|------------+    | |
+| | +---------------+                               |            |    | |
+| +-------------------------------------------------|-nono seam--|----+ |
+|                                                   v            v      |
+| +------------------------- host systemd (outside nono) -------------+ |
+| | +-------------------------+       +----------------------------+  | |
+| | | Git credentials socket  |       | GitHub MCP socket          |  | |
+| | | /run/agentic-git-      |       | /run/agentic-github-       |  | |
+| | | credentials.sock (0600) |       | mcp.sock (0600)            |  | |
+| | +------------|------------+       +-------------|--------------+  | |
+| |      Accept=true: one instance per connection  |                 | |
+| | +------------v------------+       +-------------v--------------+  | |
+| | | git-credentials@0       |       | github-mcp@0 (stdio)       |  | |
+| | | broker: one request     |       | GitHub PR/issues tools     |  | |
+| | +-------------------------+       +----------------------------+  | |
+| | +-------------------------+       +----------------------------+  | |
+| | | git-credentials@1       |       | github-mcp@1               |  | |
+| | | another connection      |       | another connection         |  | |
+| | +-------------------------+       +----------------------------+  | |
+| | systemd LoadCredential: App PEM -> instances; never enters nono     | |
+| | app.env: App ID; MCP also uses one installation ID                  | |
+| | broker: JWT -> installation lookup -> per-repo Contents-write token | |
+| +---------------------------------------------------------------------+ |
+|                                                                       |
+| +-- one-shot systemd unit (outside nono, runs as agentic) ----------+ |
+| | agentic-configure-git-credentials.service                          | |
+| |   -> configure-git-credentials.sh -> agentic's ~/.gitconfig        | |
+| |      (register helper; never store token in Git configuration)     | |
+| +-------------------------------------------------------------------+ |
++-----------------------------------------------------------------------+
+     | Git HTTPS from Pi; broker/MCP GitHub API calls from host systemd
+     v
++---------------------------- GitHub (remote) ----------------------------+
+| Installed App permissions and repository rulesets constrain operations. |
++-------------------------------------------------------------------------+
 ```
+
+Each `@` box represents a separate systemd service instance created for one connection, not a separate GitHub App. The two columns are independent: Git receives a Contents-write token, while MCP uses its own App authentication for PRs and issues. The token crosses into nono for Git; the private key does not.
 
 The per-connection broker instance keeps the root-owned PEM out of Pi's sandbox: Git's helper cannot run the signer directly without access to that key. One instance per request is a simple stateless choice, not a GitHub requirement; a long-running broker could instead handle connections and cache tokens. The socket's host permissions restrict who can connect, but **any process with socket access can request a Contents-write token** for any repository where this App is installed. The helper is not the socket's only possible caller. GitHub rulesets must protect branches; the broker does not enforce branch names. When pathname socket mediation is disabled in nono, `--allow-unix-socket` is not itself an enforced restriction.
 
