@@ -224,7 +224,7 @@ in {
     };
   };
   systemd.services.agentic-configure-git-credentials = {
-    description = "Configure agentic Git credential helper for GitHub HTTPS repositories";
+    description = "Configure agentic Git credential helper and author identity";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-tmpfiles-setup.service" ];
     serviceConfig = {

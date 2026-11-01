@@ -203,7 +203,7 @@ Then test **inside Pi** that the GitHub MCP tools are available and can read the
 		+------------------ one-shot setup ---------------------+
 		| agentic-configure-git-credentials.service           |
 		| -> configure-git-credentials.sh -> ~/.gitconfig      |
-		|    (registers helper; stores no token)              |
+		|    (registers helper and author; stores no token)   |
 		+-------------------------------------------------------+
 
 ======================= END AGENTIC VPS =======================
@@ -227,7 +227,7 @@ systemctl status agentic-git-credentials.socket agentic-configure-git-credential
 git config --global --get-all credential.https://github.com.helper
 ```
 
-The second command should be run as `agentic`; it prints only helper paths and the socket path, not tokens. Each checkout must use a GitHub HTTPS remote, and the App must be installed on that repository with Contents write permission. Verify inside `nnpi` that nono permits HTTPS to `github.com:443` (for example, `nono why --self --host github.com --port 443`); the token socket grant alone does not allow Git's network connection. Push a disposable `agentic/*` branch to confirm the complete path. If you push a workflow file, GitHub may require an additional Workflows permission; this App deliberately has none.
+The second command should be run as `agentic`; it prints only helper paths and the socket path, not tokens. Provisioning fills missing `agentic` Git identity with `agentic-workbox[bot] <agentic@localhost>` (not linked to a GitHub account), preserves existing values, and skips unchanged config. If config changes, restart running Pi/nono sessions to refresh their file grant. Each checkout must use a GitHub HTTPS remote, and the App must be installed on that repository with Contents write permission. Verify inside `nnpi` that nono permits HTTPS to `github.com:443` (for example, `nono why --self --host github.com --port 443`); the token socket grant alone does not allow Git's network connection. Push a disposable `agentic/*` branch to confirm the complete path. If you push a workflow file, GitHub may require an additional Workflows permission; this App deliberately has none.
 
 The official GitHub MCP server authenticates GitHub Apps in **`stdio` mode**, signs JWTs, and refreshes short-lived installation tokens itself. Its `http` mode does not provide the same built-in App-auth flow. Therefore the installed bridge must carry actual MCP messages between Pi and the stdio server, not merely expose a socket path.
 
