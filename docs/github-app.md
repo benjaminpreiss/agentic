@@ -20,7 +20,7 @@ Install it on **Only select repositories**, starting with `benjaminpreiss/agenti
 
 ## 2. Protect the default branch
 
-In each repository, use **Settings → Rules → Rulesets**. Follow [the recommended two-ruleset layout](recommended-rulesets.md): a `~DEFAULT_BRANCH` ruleset requiring squash-only PRs, an approval, stale-review dismissal, and checks; and a separate `~ALL` ruleset blocking force pushes and deletions. Work branches, including any exact `agentic` branch, should allow direct pushes—do not impose PR requirements on them. Confirm the App has **no bypass privileges**. Rulesets cannot require approval from *benjaminpreiss* specifically: a trusted merge service would have to verify the identity and current head immediately before merging.
+In each repository, use **Settings → Rules → Rulesets** and follow [the recommended rulesets](recommended-rulesets.md). Confirm the App has **no bypass privileges**. GitHub rulesets cannot require approval from *benjaminpreiss* specifically; enforcing a particular reviewer's identity would require a separate trusted merge service.
 
 ## 3. Prepare private credentials locally
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Shared, credential-free flake source staging for install and update.
+# Build the .deployment/ Nix flake source for BOTH prepare.sh and apply.sh.
+# The source layout here matches paths referenced by nixos/modules/*.nix:
+# modules/, scripts/, profiles/, github-protection/, skills/ and flake.nix.
+# Only these reviewed, credential-free inputs are copied; generated machine
+# records and flake.lock stay in the destination, secrets/ never enters it.
+# Run through the install/update workflows, not as an operator command.
 # Bash 3.2 compatible; never copy the whole repository.
 set -euo pipefail
 [[ $# == 1 ]] || { echo 'Usage: bash scripts/stage.sh DEPLOY_DIR' >&2; exit 2; }

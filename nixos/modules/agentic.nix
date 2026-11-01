@@ -128,7 +128,10 @@ in {
   # must find the sandbox launchers, not an unsandboxed binary.
   environment.systemPackages = [ sandboxedPi sandboxedOmp status auditReport backup pkgs.ghostty.terminfo nonoPkg herdrPkg ];
 
-  # Pi discovers recursively. Only manage our own directory; user skills are untouched.
+  # Activation installs the currently selected skills as links to the staged,
+  # versioned source and updates links from previous generations. It manages
+  # only skills/agentic; the old skills/mattpocock link is an operator cleanup
+  # step (see docs/skills-migration.md), not an activation side effect.
   systemd.services.agentic-skills = {
     description = "Install global Pi skills and agentic nono profiles";
     wantedBy = [ "multi-user.target" ];

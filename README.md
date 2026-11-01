@@ -1,16 +1,23 @@
-# Agentic NixOS
+# Agentic
 
-Deploy a sandboxed Pi and Oh My Pi workstation with NixOS. **Installing erases a disk; updating an installed machine does not.** Start with the guide for your task:
+A modular repository for building and maintaining an agentic machine. It brings together NixOS deployment, GitHub remote access and protection checks, sandboxed agents, and versioned skills. Pi and Oh My Pi are the current agent integrations, not the limits of the project. Installation and updates are scripted today; the layout keeps these responsibilities separate as deployment automation grows.
 
-- [Install a new machine](docs/install.md) — discovery, disk confirmation, recovery password and destructive deployment.
-- [Update an installed machine](docs/update.md) — refresh staged sources and switch NixOS over SSH, without Disko.
-- [Use sandboxed agents and select skills](docs/sandbox.md).
-- [Configure GitHub App access](docs/github-app.md).
+## Choose a task
 
-## Where things live
+| Task | Guide | Safety boundary |
+| --- | --- | --- |
+| Install NixOS on a new machine | [Install](docs/install.md) | **Erases the confirmed disk** using Disko. |
+| Change an existing NixOS machine | [Update](docs/update.md) | Switches NixOS over SSH; **never runs Disko**. |
+| Set up GitHub access and branch protections | [GitHub App](docs/github-app.md) | Private keys stay outside the flake and agent sandboxes. |
+| Run sandboxed agents and select skills | [Sandbox and skills](docs/sandbox.md) | Only checked-in enabled skills are installed. |
+| Upgrade a machine installed before PR #28 | [Upgrade notes](docs/skills-migration.md) | Existing skills are not removed automatically. |
 
-`nixos/` holds the flake, modules and nono profiles. `scripts/install/` and `scripts/update/` are the operator workflows; both call `scripts/stage.sh` to prepare a credential-free flake source. `scripts/runtime/` supplies host-side credential code. `scripts/github/` and `github-protection/` contain GitHub setup and audit code. `skills/available/` contains versioned skills; checked-in links in `skills/enabled/` are the only selection interface. See [the skills decision](docs/adr/0001-select-skills-with-checked-in-symlinks.md).
+## Repository map
 
-`.deployment/` contains machine-specific configuration and the lock file; retain it privately for future updates. `secrets/` contains local GitHub App credentials; **neither directory belongs in Git history.** Only explicit, credential-free sources are copied into the staged flake. Do not put secrets in Nix expressions or the Nix store.
+- `nixos/`: flake, system modules and local nono profiles.
+- `scripts/install/`, `scripts/update/`: operator workflows. Both use `scripts/stage.sh` to build the credential-free deployment source.
+- `scripts/runtime/`, `scripts/github/`, `github-protection/`: host-side GitHub credentials, setup and protection audits.
+- `skills/available/`: reviewed, versioned skills. Checked-in links under `skills/enabled/` are the sole installation selection; see the [decision record](docs/adr/0001-select-skills-with-checked-in-symlinks.md).
+- `docs/`: task guides, security guidance and decisions.
 
-No production deployment is performed by this repository checkout alone. Unattended NixOS upgrades are disabled.
+`.deployment/` holds generated machine configuration and the Nix lock file. Keep it privately for updates; it is Git-ignored. `secrets/` holds local GitHub App credentials and is also Git-ignored. **Never commit either, put secrets in Nix expressions, or copy the key into the Nix store.** Unattended NixOS upgrades are disabled.

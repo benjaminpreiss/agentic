@@ -1,31 +1,61 @@
-# Install a new Agentic machine
+# Install Agentic NixOS on a new machine
 
-**This installs NixOS by repartitioning and formatting the selected whole disk. It cannot preserve existing partitions.** Back up data off-server and verify SSH and out-of-band console access before proceeding. For an existing Agentic NixOS machine, use the [non-destructive update](update.md) instead.
+Use this guide to replace the operating system on a remote machine. **Installation repartitions and formats the selected entire disk. Existing partitions and on-disk backups will be lost.** For a machine already running Agentic NixOS, use the [update guide](update.md) instead.
 
-From the repository root on a Mac or Linux deployment computer, install `ssh`, `nix` (with flakes), and `nixos-anywhere`. Keep this checkout private; `.deployment/` and `secrets/` are ignored by Git.
+## 1. Check prerequisites
 
-## Prepare and inspect
+On your Mac or Linux deployment computer, use this repository checkout with Bash, SSH and Nix with flakes enabled. Have the target's SSH address, a local public SSH key and a provider console ready. The target must be reachable by SSH with root or passwordless sudo; the installer uses `nixos-anywhere`. Back up all data **off the target** and verify that you can recover it. Keep this checkout private: `.deployment/` will contain machine settings and a password hash, and `secrets/` may contain private keys. Both are Git-ignored.
+
+## 2. Discover the target and select the disk
+
+From the repository root, run:
 
 ```bash
 bash scripts/install/prepare.sh
+```
+
+The interactive discovery queries the machine, asks you to choose a **whole disk to erase**, and confirms boot mode, network settings and SSH key. It refuses to replace an existing `.deployment/`. It does **not** format the disk. For a different target, back up your existing `.deployment/` separately before preparing again.
+
+Review the result **before continuing**:
+
+```bash
+cat .deployment/target.txt .deployment/selected-disk.txt
+cat .deployment/generated/machine.nix
+```
+
+Confirm the host, disk, boot and network values match the intended machine. If any value is wrong, stop; do not proceed to installation.
+
+## 3. Set a console recovery password
+
+```bash
 bash scripts/install/recovery-password.sh
+```
+
+Enter a temporary password for the `recovery` account at the prompt. The command saves only a password hash under `.deployment/extra-files/`, not plaintext. Protect that directory. The recovery account is for the provider's **out-of-band console**, not SSH password login.
+
+## 4. Run preflight checks
+
+```bash
 bash scripts/install/preflight.sh
 ```
 
-Preparation queries the target over SSH, asks for an explicit **whole disk to erase**, network mode, SSH key and boot settings, then stages only the declared NixOS sources. It refuses an existing `.deployment/`. Save that directory privately; do not delete it after deployment. The recovery password is for the provider's console, not SSH. Preflight obtains the hardware report and pins flake dependencies before evaluation.
+Preflight rechecks the remote whole disk, boot mode, network interface and MAC address. It pins flake inputs, evaluates the NixOS derivation and verifies the effective bootloader and network configuration. Review its output, especially the disk and network choices. For static networking, IPv6 or provider-specific routing, independently confirm the configuration. Preflight does not format the disk.
 
-Check `.deployment/generated/machine.nix`, `.deployment/selected-disk.txt`, `.deployment/target.txt`, and `.deployment/generated/facter.json` against your target. If anything is wrong, stop and correct the preparation before deployment.
+## 5. Deploy — destructive
 
-## Destructive deployment
-
-**The following command erases the selected disk. Verify backups and disk identity first.**
+**Stop unless off-server backups, out-of-band recovery access and the selected disk are verified. The next command invokes Disko and erases that disk.**
 
 ```bash
 bash scripts/install/deploy.sh --install
 ```
 
-The installer requires `--install` and a final disk confirmation; it invokes nixos-anywhere with Disko. Do not run it to repair or update an installed machine.
+The installer reruns preflight and requires you to type `ERASE-AND-INSTALL-NIXOS` at the final prompt. It then calls `nixos-anywhere`. Do not use this command for updates or repairs.
 
-## Verify and recover
+## 6. Verify the first boot
 
-After boot, confirm SSH as `agentic` and check `journalctl -u agentic-firstboot-check -b --no-pager`, networking, `pi --version`, and `omp --version`. A reinstall changes the SSH host key: verify its new fingerprint through a trusted console before updating `known_hosts`. Test the `recovery` password using the provider's **out-of-band console**. Keep `.deployment/generated/{machine.nix,facter.json}` and `.deployment/flake.lock` for [updates](update.md); retain an off-server backup. If a launcher reports a missing nono pack, use the update workflow, not the disk installer. See [sandbox guidance](sandbox.md) and [GitHub setup](github-app.md).
+1. If the machine was reinstalled, verify its **new SSH host-key fingerprint through the provider console** before updating `known_hosts`. Confirm you can connect as `agentic` with your key.
+2. On the machine, run `journalctl -u agentic-firstboot-check -b --no-pager`; check networking and SSH. From `~/work`, test `pi --version` and `omp --version`.
+3. Test the `recovery` account password at the provider's out-of-band console. Keep that path available until networking is stable.
+4. Keep `.deployment/generated/machine.nix`, `.deployment/generated/facter.json`, `.deployment/flake.lock` and the rest of `.deployment/` privately on the deployment computer for [future updates](update.md). Back them up off-server.
+
+If a launcher reports a missing nono pack, use the [non-destructive update](update.md), not the installer. See [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md) for next steps.
