@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Sourced by check.sh. Inventories CI observed on main's current tip.
+# Sourced by check.sh. Inventories CI observed on the default branch tip.
 # Interface: check_main_ci(repo, sha, effective_rules_json).
 # This is a snapshot, not a complete inventory of PR-only workflows.
 check_main_ci() {
   local repo="$1" sha="$2" rules="$3" required available names count page error='' covered unobserved kind
   required="$(jq -c '[.[] | select(.type=="required_status_checks") | .parameters.required_status_checks[]? | (.context // empty)] | unique' <<<"$rules")"
   available='[]'
-  if [[ ! "$sha" =~ ^[0-9a-fA-F]{40}$ ]]; then error='main tip SHA unavailable'; fi
+  if [[ ! "$sha" =~ ^[0-9a-fA-F]{40}$ ]]; then error='default branch tip SHA unavailable'; fi
   if [[ -z "$error" ]]; then
     for kind in check-runs statuses; do
       page=1
@@ -32,10 +32,10 @@ check_main_ci() {
       [[ -z "$error" ]] || break
     done
   fi
-  if [[ -n "$error" ]]; then warn "main CI coverage unavailable ($error)"; return; fi
+  if [[ -n "$error" ]]; then warn "default branch CI coverage unavailable ($error)"; return; fi
   covered="$(jq -cn --argjson a "$available" --argjson r "$required" '[$a[] | select(. as $x | $r | index($x) != null)] | length')"
   count="$(jq 'length' <<<"$available")"
-  if ((count > 0 && covered == count)); then ok "main CI checks required/available: $covered/$count"; else warn "main CI checks required/available: $covered/$count"; fi
+  if ((count > 0 && covered == count)); then ok "default branch CI checks required/available: $covered/$count"; else warn "default branch CI checks required/available: $covered/$count"; fi
   unobserved="$(jq -cn --argjson a "$available" --argjson r "$required" '[$r[] | select(. as $x | $a | index($x) == null)] | join(", ")')"
-  [[ -z "$unobserved" ]] || warn "main required CI contexts not observed on tip: $unobserved"
+  [[ -z "$unobserved" ]] || warn "default branch required CI contexts not observed on tip: $unobserved"
 }
