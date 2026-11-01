@@ -42,7 +42,8 @@ let
       umask 077
       state=/var/lib/agentic-github-protection
       tmp="$(mktemp "$state/.status.XXXXXXXX")"
-      trap 'rm -f "$tmp"' EXIT
+      report_tmp="$(mktemp "$state/.report.XXXXXXXX")"
+      trap 'rm -f "$tmp" "$report_tmp"' EXIT
       checked="$(date -u +%s)"
       if output="$(AGENTIC_GITHUB_SECRETS_DIR="''${CREDENTIALS_DIRECTORY:?}" ${pkgs.bash}/bin/bash ${../github-protection}/check.sh 2>&1)"; then
         result=PASS
@@ -52,6 +53,16 @@ let
       printf '%s\n' "$output"
       summary="$(printf '%s\n' "$output" | grep '^Summary:' | tail -n 1 || true)"
       summary="''${summary:-Audit failed before summary}"
+      # Persist only audit-authored findings and the summary, not raw stderr,
+      # HTTP responses, or credentials. Publish the report before its status.
+      printf 'GitHub protection audit: %s\nChecked: %s UTC\n\n' "$result" "$(date -u -d "@$checked" '+%Y-%m-%d %H:%M')" > "$report_tmp"
+      while IFS= read -r line; do
+        case "$line" in
+          '📦 '*|'  ✅ '*|'  ⚠️  '*|'  ❌ '*|'Summary: '*|'ERROR: '*) printf '%s\n' "$line" >> "$report_tmp" ;;
+        esac
+      done <<< "$output"
+      chmod 0644 "$report_tmp"
+      mv -f "$report_tmp" "$state/report"
       printf 'checked_at=%s\nresult=%s\nsummary=%s\n' "$checked" "$result" "$summary" > "$tmp"
       chmod 0644 "$tmp"
       mv -f "$tmp" "$state/status"
