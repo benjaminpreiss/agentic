@@ -59,6 +59,25 @@ let
     echo 'MAINTENANCE'
     ${pkgs.systemd}/bin/systemctl list-timers --no-pager agentic-backup.timer 2>/dev/null || true
     echo
+    echo 'GITHUB PROTECTION AUDIT'
+    audit_status=/var/lib/agentic-github-protection/status
+    if [ -r "$audit_status" ]; then
+      checked="$(${pkgs.gawk}/bin/awk -F= '$1 == "checked_at" {print $2; exit}' "$audit_status")"
+      result="$(${pkgs.gawk}/bin/awk -F= '$1 == "result" {print $2; exit}' "$audit_status")"
+      summary="$(${pkgs.gawk}/bin/awk -F= '$1 == "summary" {sub(/^[^=]*=/, ""); print; exit}' "$audit_status")"
+      now="$(${pkgs.coreutils}/bin/date -u +%s)"
+      if [[ "$checked" =~ ^[0-9]+$ && "$result" =~ ^(PASS|FAIL)$ ]] &&
+         (( checked <= now && now - checked < 172800 )); then
+        printf '  %s: %s\n' "$result" "$summary"
+        printf '  Checked: %s UTC\n' "$(${pkgs.coreutils}/bin/date -u -d "@$checked" '+%Y-%m-%d %H:%M')"
+      else
+        echo '  STALE: no recent valid audit result (older than 48 hours)'
+      fi
+    else
+      echo '  NOT RUN: no audit status yet'
+    fi
+    echo '  Run now: sudo systemctl start agentic-github-protection-audit.service'
+    echo
     echo 'FIREWALL (DECLARED GLOBAL ALLOW RULES)'
     echo '  Firewall enabled: ${if config.networking.firewall.enable then "yes" else "no"}'
     echo '  TCP: ${formatPorts tcpPorts}'
