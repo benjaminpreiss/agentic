@@ -100,6 +100,7 @@ STAGE="$(mktemp -d "$ROOT/.deployment.stage.XXXXXX")"
 trap 'rm -rf "$STAGE"; rm -f "$DISC"' EXIT
 cp "$ROOT/flake.nix" "$STAGE/flake.nix"
 cp -R "$ROOT/modules" "$STAGE/modules"
+bash "$ROOT/scripts/stage-github-protection.sh" "$STAGE"
 cp -R "$ROOT/profiles" "$STAGE/profiles"
 mkdir -p "$STAGE/generated"
 {
