@@ -1,22 +1,18 @@
-# Input: effective rules for one branch; argument: --arg branch <name>.
-# Only main requires a PR. Every other branch is directly writable work.
+# Input: effective rules array from GET /repos/{owner}/{repo}/rules/branches/{branch}.
+# Arguments: --arg branch <branch name> --arg default_branch <name>.
+# Effective rules do not expose reviewer identity or App bypass permissions.
 . as $rules
 | [.[] | select(.type == "pull_request")] as $prs
-| [
-    (if $branch == "main" then
-      if ($prs | length) > 0 then
-        {status: "ok", message: "requires a pull request"}
-      else
-        {status: "fail", message: "requires a pull request"}
-      end
-    elif ($prs | length) == 0 then
-      {status: "ok", message: "permits direct pushes (no PR rule)"}
-    else
-      {status: "fail", message: "PR rule blocks direct pushes to a work branch"}
-    end),
+| (if $branch != $default_branch then
+    [{status: (if ($prs | length) == 0 then "ok" else "fail" end),
+      message: "work branch permits direct pushes (no PR rule)"}]
+  else [
+    {status: (if ($prs | length) > 0 then "ok" else "fail" end),
+     message: "requires a pull request"},
 
-    (if $branch != "main" then empty
-    elif ($prs | length) == 0 then
+    # All applicable PR rules must specify squash only; missing method data
+    # is unverifiable and therefore fails rather than passing by default.
+    (if ($prs | length) == 0 then
       {status: "fail", message: "squash-only merging: no pull-request rule"}
     elif all($prs[]; .parameters.allowed_merge_methods == ["squash"]) then
       {status: "ok", message: "allows squash merging only"}
@@ -24,20 +20,18 @@
       {status: "fail", message: "squash-only merging: allowed methods missing or include merge/rebase"}
     end),
 
-    (if $branch != "main" then empty
-    elif any($prs[]; (.parameters.required_approving_review_count // 0) >= 1) then
+    (if any($prs[]; (.parameters.required_approving_review_count // 0) >= 1) then
       {status: "ok", message: "requires at least one PR approval"}
     else
       {status: "fail", message: "requires at least one PR approval"}
     end),
 
-    (if $branch != "main" then empty
-    elif any($prs[]; .parameters.dismiss_stale_reviews_on_push == true) then
+    (if any($prs[]; .parameters.dismiss_stale_reviews_on_push == true) then
       {status: "ok", message: "dismisses stale approvals after new commits"}
     else
       {status: "fail", message: "must dismiss stale approvals after new commits"}
-    end),
-
+    end)
+  ] end) + [
     {status: (if any($rules[]; .type == "non_fast_forward") then "ok" else "fail" end),
      message: "blocks force pushes"},
     {status: (if any($rules[]; .type == "deletion") then "ok" else "fail" end),
