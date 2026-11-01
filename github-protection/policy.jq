@@ -1,16 +1,24 @@
-# Input: effective rules array from GET /repos/{owner}/{repo}/rules/branches/{branch}.
-# Argument: --arg branch <branch name>. Output: one array of {status, message}.
-# Effective rules do not expose reviewer identity or App bypass permissions.
+# Input: effective branch rules; argument: --arg branch <name>.
+# agentic/* branches are directly writable work branches. PRs into them are
+# optional; GitHub cannot both require PRs and allow ordinary direct pushes.
 . as $rules
 | [.[] | select(.type == "pull_request")] as $prs
-| ($branch | startswith("agentic/")) as $autonomous
+| ($branch | startswith("agentic/")) as $work
 | [
-    {status: (if ($prs | length) > 0 then "ok" else "fail" end),
-     message: "requires a pull request"},
+    (if $work then
+      if ($prs | length) == 0 then
+        {status: "ok", message: "permits direct pushes (no PR rule)"}
+      else
+        {status: "fail", message: "PR rule blocks direct pushes to agentic/*"}
+      end
+    elif ($prs | length) > 0 then
+      {status: "ok", message: "requires a pull request"}
+    else
+      {status: "fail", message: "requires a pull request"}
+    end),
 
-    # All applicable PR rules must specify squash only; missing method data
-    # is unverifiable and therefore fails rather than passing by default.
-    (if ($prs | length) == 0 then
+    (if $work then empty
+    elif ($prs | length) == 0 then
       {status: "fail", message: "squash-only merging: no pull-request rule"}
     elif all($prs[]; .parameters.allowed_merge_methods == ["squash"]) then
       {status: "ok", message: "allows squash merging only"}
@@ -18,19 +26,14 @@
       {status: "fail", message: "squash-only merging: allowed methods missing or include merge/rebase"}
     end),
 
-    (if $autonomous then
-      if any($prs[]; (.parameters.required_approving_review_count // 0) > 0) then
-        {status: "warn", message: "requires approvals (autonomous merges may be blocked)"}
-      else
-        {status: "ok", message: "permits zero-approval PR merges"}
-      end
+    (if $work then empty
     elif any($prs[]; (.parameters.required_approving_review_count // 0) >= 1) then
       {status: "ok", message: "requires at least one PR approval"}
     else
       {status: "fail", message: "requires at least one PR approval"}
     end),
 
-    (if $autonomous then empty
+    (if $work then empty
     elif any($prs[]; .parameters.dismiss_stale_reviews_on_push == true) then
       {status: "ok", message: "dismisses stale approvals after new commits"}
     else

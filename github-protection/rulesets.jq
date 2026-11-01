@@ -1,18 +1,21 @@
 # Input: detailed rulesets returned by GET /repos/{owner}/{repo}/rulesets/{id}
 # with includes_parents=true (the list endpoint selects rulesets for this repo).
-# A conservative proof of future coverage: a ~ALL rule covers every branch.
-# Exclusions are acceptable for non-agentic targets only if they cannot match
-# anything outside refs/heads/agentic/. Other patterns may be valid but are
-# reported as unverified rather than being silently assumed to cover all refs.
+# The common safety rule covers ~ALL. GitHub also returns include: [] for an
+# all-branches rule with exclusions; accept that shape only for non-agentic
+# targets when every exclusion has the literal refs/heads/agentic/ prefix.
+# Other patterns are unproven. Effective branch samples still run separately.
 . as $sets
 | def universal($class):
     .enforcement == "active" and .target == "branch"
-    and ((.conditions.ref_name.include // []) | index("~ALL") != null)
+    and ((.conditions.ref_name.include // []) | type == "array")
     and ((.conditions.ref_name.exclude // []) | type == "array")
     and (if $class == "all" then
-      (.conditions.ref_name.exclude | length == 0)
+      ((.conditions.ref_name.include | index("~ALL")) != null)
+      and (.conditions.ref_name.exclude | length == 0)
     else
-      all(.conditions.ref_name.exclude[]; startswith("refs/heads/agentic/"))
+      (((.conditions.ref_name.include | index("~ALL")) != null)
+       or ((.conditions.ref_name.include | length == 0) and (.conditions.ref_name.exclude | length > 0)))
+      and all(.conditions.ref_name.exclude[]; startswith("refs/heads/agentic/"))
     end);
   def rule($kind; $class):
     any($sets[]; universal($class) and any(.rules[]?;
@@ -24,14 +27,20 @@
         .parameters.dismiss_stale_reviews_on_push == true
       else .type == $kind end));
   [
-    (if rule("squash"; "all") then
-       {status: "ok", message: "all branch names covered by a squash-only PR rule"}
-     else {status: "fail", message: "cannot prove all branches have a squash-only PR rule (~ALL with no exclusions required)"} end),
+    (if rule("squash"; "non-agentic") then
+       {status: "ok", message: "non-agentic/* targets covered by a squash-only PR rule"}
+     else {status: "fail", message: "cannot prove squash-only PR coverage for non-agentic/* targets"} end),
     (if rule("approval"; "non-agentic") then
        {status: "ok", message: "all non-agentic/* targets require approvals and dismiss stale reviews"}
      else {status: "fail", message: "cannot prove approvals and stale-review dismissal for every non-agentic/* target"} end),
-    (if rule("approval"; "all") then
-       {status: "warn", message: "universal approval rule may block autonomous agentic/* merges"}
+    (if any($sets[]; universal("all") and any(.rules[]?; .type == "pull_request")) then
+       {status: "fail", message: "all-branches PR rule blocks direct pushes to agentic/*"}
+     else empty end),
+    (if any($sets[]; .enforcement == "active" and .target == "branch" and
+        (.conditions.ref_name.include == []) and
+        all(.conditions.ref_name.exclude[]?; startswith("refs/heads/agentic/")) and
+        (.conditions.ref_name.exclude | length > 0)) then
+       {status: "warn", message: "GitHub reports include: [] for an all-except-agentic/* rule; confirm effective rules on representative branches"}
      else empty end),
     (if rule("non_fast_forward"; "all") then
        {status: "ok", message: "all branch names block force pushes"}

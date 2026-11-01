@@ -36,6 +36,6 @@ check_main_ci() {
   covered="$(jq -cn --argjson a "$available" --argjson r "$required" '[$a[] | select(. as $x | $r | index($x) != null)] | length')"
   count="$(jq 'length' <<<"$available")"
   if ((count > 0 && covered == count)); then ok "main CI checks required/available: $covered/$count"; else warn "main CI checks required/available: $covered/$count"; fi
-  unobserved="$(jq -cn --argjson a "$available" --argjson r "$required" '[$r[] | select(. as $x | $a | index($x) == null)] | join(", ")')"
+  unobserved="$(jq -rn --argjson a "$available" --argjson r "$required" '[$r[] | select(. as $x | $a | index($x) == null)] | join(", ")')"
   [[ -z "$unobserved" ]] || warn "main required CI contexts not observed on tip: $unobserved"
 }
