@@ -21,7 +21,7 @@ Both launchers require the current directory to be under `~/work` and forward ar
 
 The GitHub App private key stays **outside** both sandboxes. Pi and OMP have separate agent configurations; OMP provider login and settings are not provisioned automatically.
 
-Pi's `suppress_save_prompt: ["/"]` prevents denied paths from being offered for an interactive profile-save grant on exit. It does **not** grant access or hide denial diagnostics. A denial (including `/tmp`) must be investigated and any needed access changed deliberately outside the session; do not grant all of `/tmp` to avoid a warning. This setting applies to both interactive `pi` and `pi -p ...`. The legacy `nnpi.sh` installer generates the same Pi policy. OMP has a separate profile and still grants all of `~/work`.
+Pi's `suppress_save_prompt: ["/"]` prevents denied paths from being offered for an interactive profile-save grant on exit. It does **not** grant access or hide denial diagnostics. A denial (including `/tmp`) must be investigated and any needed access changed deliberately outside the session; do not grant all of `/tmp` to avoid a warning. This setting applies to both interactive `pi` and `pi -p ...`. OMP has a separate profile and still grants all of `~/work`.
 
 ## What the wrappers do—and do not protect
 

@@ -125,15 +125,20 @@ modules/
   agentic.nix             Agent user, shell, workspace, dashboard, backups
   recovery.nix            Console recovery account
   firstboot.nix           First-boot diagnostic service
+  github-mcp.nix          GitHub MCP and Git credential socket services
+profiles/                 Local nono profiles for Pi and OMP
 scripts/
   prepare.sh              SSH discovery and machine-specific generation
   recovery-password.sh    Interactive console recovery credential setup
   preflight.sh            Read-only pre-installation validation
   deploy.sh               Destructive fresh installation
   apply.sh                Non-destructive configuration update
- docs/
+  git-app-token-broker.sh GitHub App token broker (server runtime)
+  git-credential-helper.sh Git credential helper (agent runtime)
+docs/
   APPLY-EXISTING-NIXOS.md  Updating a running NixOS machine
-  POSTINSTALL.md          Post-installation checks and future integrations
+  SANDBOXED-AGENTS.md      Pi and OMP sandbox launchers
+  POSTINSTALL.md           Post-installation checklist
 .deployment/              Generated per-machine files (not committed)
 ```
 
@@ -141,7 +146,7 @@ scripts/
 
 The current NixOS bundle defines the `agentic` user and `~/work`, Zsh and Starship, Ghostty terminfo, SSH and MAC-based networking, basic OS hardening, firewall configuration, a terminal status screen, a console recovery user, first-boot diagnostics, and local home-directory backups (14-archive retention).
 
-Pi, nono, Herdr, skills, GitHub MCP/App authentication, and GitHub App-backed Git HTTPS credentials are declared in the NixOS modules. Git push to any GitHub HTTPS repository where this App is installed requires deploying those modules and App credentials; multiple different GitHub Apps are not supported simultaneously. See `AGENTIC_GITHUB_SETUP.md` for setup and verification. Unattended NixOS system upgrades remain disabled. Do not assume feature parity with the earlier Ubuntu `nnpi.sh`.
+The NixOS modules declare Pi, OMP, nono, Herdr, skills, GitHub MCP/App authentication, and GitHub App-backed Git HTTPS credentials. Git push to GitHub HTTPS repositories where this App is installed requires deploying those modules and App credentials; multiple different GitHub Apps are not supported simultaneously. See [AGENTIC_GITHUB_SETUP.md](AGENTIC_GITHUB_SETUP.md) for setup and verification. Unattended NixOS system upgrades remain disabled.
 
 The backup archives live on the same server and are **not** a substitute for off-server backups. The flake and hardware/network setup still need end-to-end testing for each target environment.
 

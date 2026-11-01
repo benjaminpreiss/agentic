@@ -1,0 +1,3 @@
+/.deployment/
+/.deployment.stage.*/
+/secrets/
