@@ -6,15 +6,7 @@ This guide sets up a GitHub App for sandboxed Pi: the official MCP server provid
 
 ## 1. Create and install the App
 
-From the repository root, print a **prefilled registration link**:
-
-```bash
-bash scripts/github/print-app-registration-url.sh
-# If the suggested name is taken, supply your own unique name:
-bash scripts/github/print-app-registration-url.sh your-agent-app
-```
-
-Open the printed URL in a browser. It uses this project's repository as the App **homepage**, not as a repository-access grant; you choose which of *your* repositories to install the App on later. The default name is `agentic-workbox`, but GitHub requires App names to be unique across GitHub **even for private Apps**, so choose a different name if it is unavailable. Check the prefilled visibility, webhook/OAuth settings and permissions before submitting. You can also use the [unfilled registration form](https://github.com/settings/apps/new) or [edit an existing App](https://github.com/settings/apps). Choose a **private App**, disable webhooks and OAuth on installation, and confirm these repository permissions:
+[Open the prefilled GitHub App registration form](https://github.com/settings/apps/new?name=agentic-workbox&description=Sandboxed%20coding%20agents%20with%20gated%20merges&url=https%3A%2F%2Fgithub.com%2Fbenjaminpreiss%2Fagentic&public=false&webhook_active=false&request_oauth_on_install=false&contents=write&pull_requests=read&issues=read&actions=read&checks=read&statuses=read), or [edit an existing App](https://github.com/settings/apps). The homepage points to **this project**, not to a repository the App can access; you select which repositories to install the App on later. If the suggested name `agentic-workbox` is taken, choose your own unique name on the form. Check every prefilled setting before submitting: make it **private**, disable webhooks and OAuth on installation, and confirm these repository permissions:
 
 | Permission | Level |
 | --- | --- |
