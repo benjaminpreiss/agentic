@@ -15,7 +15,7 @@ socket=/test/credential.sock
 
 bash "$script" "$helper" "$socket"
 [[ "$(git config --global --get user.name)" == 'agentic-workbox[bot]' ]]
-[[ "$(git config --global --get user.email)" == '350248949+agentic-workbox[bot]@users.noreply.github.com' ]]
+[[ "$(git config --global --get user.email)" == 'agentic@localhost' ]]
 [[ "$(git config --global --get credential.https://github.com.useHttpPath)" == true ]]
 mapfile -t helpers < <(git config --global --get-all "$key")
 [[ ${#helpers[@]} == 2 && ${helpers[0]} == "" && ${helpers[1]} == "$helper $socket" ]]
@@ -46,5 +46,5 @@ mapfile -t helpers < <(git config --global --get-all "$key")
 git config --global --unset user.email
 bash "$script" /test/new-helper "$socket"
 [[ "$(git config --global --get user.name)" == 'Custom Agent' ]]
-[[ "$(git config --global --get user.email)" == '350248949+agentic-workbox[bot]@users.noreply.github.com' ]]
+[[ "$(git config --global --get user.email)" == 'agentic@localhost' ]]
 echo 'Git identity and helper provisioning: PASS'

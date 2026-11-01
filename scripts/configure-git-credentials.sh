@@ -25,5 +25,5 @@ if [[ -z "$(git config --global --get user.name || true)" ]]; then
   git config --global user.name 'agentic-workbox[bot]'
 fi
 if [[ -z "$(git config --global --get user.email || true)" ]]; then
-  git config --global user.email '350248949+agentic-workbox[bot]@users.noreply.github.com'
+  git config --global user.email 'agentic@localhost'
 fi

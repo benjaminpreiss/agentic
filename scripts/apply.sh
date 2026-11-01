@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# Validate credential-free Git provisioning before staging or switching NixOS.
+bash "$ROOT/scripts/test-configure-git-credentials.sh"
 DEPLOY="$ROOT/.deployment"
 for f in flake.nix flake.lock generated/machine.nix generated/facter.json target.txt; do
   [[ -f "$DEPLOY/$f" ]] || { echo "Missing .deployment/$f" >&2; exit 1; }
