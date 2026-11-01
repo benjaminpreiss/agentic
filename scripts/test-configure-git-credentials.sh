@@ -17,7 +17,10 @@ bash "$script" "$helper" "$socket"
 [[ "$(git config --global --get user.name)" == 'agentic-workbox[bot]' ]]
 [[ "$(git config --global --get user.email)" == 'agentic@localhost' ]]
 [[ "$(git config --global --get credential.https://github.com.useHttpPath)" == true ]]
-mapfile -t helpers < <(git config --global --get-all "$key")
+helpers=()
+while IFS= read -r value; do
+  helpers+=("$value")
+done < <(git config --global --get-all "$key")
 [[ ${#helpers[@]} == 2 && ${helpers[0]} == "" && ${helpers[1]} == "$helper $socket" ]]
 # A freshly provisioned user can commit without -c user.* overrides.
 git -C "$tmp" init -q repo
@@ -25,12 +28,12 @@ git -C "$tmp/repo" -c commit.gpgsign=false commit -q --allow-empty -m test
 [[ "$(git -C "$tmp/repo" log -1 --format=%an)" == 'agentic-workbox[bot]' ]]
 
 # A repeat apply must not replace the global config (or write to its inode).
-before_inode="$(stat -c %i "$HOME/.gitconfig")"
-before_content="$(sha256sum "$HOME/.gitconfig")"
+before_inode="$(ls -id "$HOME/.gitconfig")"
+before_content="$(git hash-object "$HOME/.gitconfig")"
 chmod 0444 "$HOME/.gitconfig"
 bash "$script" "$helper" "$socket"
-[[ "$(stat -c %i "$HOME/.gitconfig")" == "$before_inode" ]]
-[[ "$(sha256sum "$HOME/.gitconfig")" == "$before_content" ]]
+[[ "$(ls -id "$HOME/.gitconfig")" == "$before_inode" ]]
+[[ "$(git hash-object "$HOME/.gitconfig")" == "$before_content" ]]
 chmod 0600 "$HOME/.gitconfig"
 
 # Existing explicit identity is preserved even when a helper must change.
@@ -39,7 +42,10 @@ git config --global user.email 'custom@example.invalid'
 bash "$script" /test/new-helper "$socket"
 [[ "$(git config --global --get user.name)" == 'Custom Agent' ]]
 [[ "$(git config --global --get user.email)" == 'custom@example.invalid' ]]
-mapfile -t helpers < <(git config --global --get-all "$key")
+helpers=()
+while IFS= read -r value; do
+  helpers+=("$value")
+done < <(git config --global --get-all "$key")
 [[ ${#helpers[@]} == 2 && ${helpers[0]} == "" && ${helpers[1]} == "/test/new-helper $socket" ]]
 
 # Preserve an explicitly set name while filling in only a missing email.
