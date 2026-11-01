@@ -495,8 +495,8 @@ cat > "$playbook" <<'YAML'
             },
             "workdir": { "access": "readwrite" },
             "filesystem": {
-              "allow": ["$HOME/work"],
-              "read": ["$HOME/.pi/agent/skills"]
+              "read": ["$HOME/.pi/agent/skills"],
+              "suppress_save_prompt": ["/"]
             }
           }
 
