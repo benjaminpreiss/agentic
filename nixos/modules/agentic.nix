@@ -139,11 +139,6 @@ in {
       install -d -o agentic -g users -m 0755 /home/agentic/.pi /home/agentic/.pi/agent /home/agentic/.pi/agent/skills
       install -d -o agentic -g users -m 0755 /home/agentic/.config /home/agentic/.config/nono
       install -d -o agentic -g users -m 0700 /home/agentic/.config/nono/profiles
-      # Retire only the old pinned Matt skills link, never a user directory.
-      legacy=/home/agentic/.pi/agent/skills/mattpocock
-      if [ -L "$legacy" ]; then
-        case "$(readlink "$legacy")" in /nix/store/*-source) rm -- "$legacy" ;; esac
-      fi
       managed=/home/agentic/.pi/agent/skills/agentic
       if [ -L "$managed" ] || { [ -e "$managed" ] && [ ! -f "$managed/.agentic-managed" ]; }; then
         echo "Refusing to replace user-managed skills at $managed" >&2
