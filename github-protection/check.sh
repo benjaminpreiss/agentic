@@ -52,7 +52,7 @@ check_effective() {
 }
 
 audit_repo() {
-  local repo="$1" results main_sha branch agentic_sample='' other_sample=''
+  local repo="$1" results main_sha branch work_sample=''
   [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'ERROR: invalid repository identifier' >&2; exit 2; }
   printf '\n📦 %s\n' "$repo"
   if load_rulesets "$repo"; then
@@ -76,14 +76,9 @@ audit_repo() {
       for branch in "${branches[@]}"; do [[ "$branch" == main ]] || check_effective "$repo" "$branch" || true; done
     else
       for branch in "${branches[@]}"; do
-        case "$branch" in
-          agentic/*) [[ -n "$agentic_sample" ]] || agentic_sample="$branch" ;;
-          main) ;;
-          *) [[ -n "$other_sample" ]] || other_sample="$branch" ;;
-        esac
+        if [[ "$branch" != main ]]; then work_sample="$branch"; break; fi
       done
-      if [[ -n "$agentic_sample" ]]; then check_effective "$repo" "$agentic_sample" || true; else warn 'no existing agentic/* branch sampled'; fi
-      if [[ -n "$other_sample" ]]; then check_effective "$repo" "$other_sample" || true; else warn 'no other non-agentic/* branch sampled'; fi
+      if [[ -n "$work_sample" ]]; then check_effective "$repo" "$work_sample" || true; else warn 'no existing work branch sampled'; fi
     fi
   fi
   warn 'Effective rules do not prove reviewer identity or actual merge authorization; test with App credentials and use a trusted merge gate'
