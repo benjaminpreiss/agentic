@@ -131,7 +131,7 @@ in {
   # Activation installs the currently selected skills as links to the staged,
   # versioned source and updates links from previous generations. It manages
   # only skills/agentic; the old skills/mattpocock link is an operator cleanup
-  # step (see docs/skills-migration.md), not an activation side effect.
+  # step (see docs/upgrades/PR-28-ACTION-REQUIRED.md), not an activation side effect.
   systemd.services.agentic-skills = {
     description = "Install global Pi skills and agentic nono profiles";
     wantedBy = [ "multi-user.target" ];

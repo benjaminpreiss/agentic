@@ -47,15 +47,6 @@ The script stages sources and evaluates the complete NixOS derivation **before**
 
 ## 5. Verify and recover
 
-Reconnect as `agentic`, then check the commands and services relevant to your change:
-
-```bash
-cd ~/work
-pi --version
-omp --version
-systemctl status agentic-backup.timer agentic-skills.service --no-pager
-```
-
-If upgrading from a version before PR #28, read the [PR #28 upgrade notes](skills-migration.md): the old Matt Pocock skills link is **not** removed automatically. Check [sandbox and skills](sandbox.md) and [GitHub setup](github-app.md) for feature-specific verification.
+Reconnect as `agentic`. Confirm SSH and networking, then check the services or harnesses affected by your change. For feature-specific checks, see [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md).
 
 If evaluation fails, no switch has occurred. If switching fails, preserve the known-good NixOS generation and diagnose via SSH or the provider console; **never run the disk installer as a repair step**. Server-local backups are not off-server backups. Unattended system upgrades remain disabled.

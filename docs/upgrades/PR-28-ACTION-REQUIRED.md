@@ -1,6 +1,6 @@
-# PR #28 upgrade notes: repository layout and skills
+# Action required after PR #28: remove the old skills link
 
-Use this guide **once** when updating an Agentic NixOS machine from a version before PR #28. These changes are not a general cleanup policy. The [normal update guide](update.md) contains the full switch procedure; this page calls out what is different for this PR.
+Use this guide **once** when updating an Agentic NixOS machine from a version before PR #28. These changes are not a general cleanup policy. The [normal update guide](../update.md) contains the full switch procedure; this page calls out what is different for this PR.
 
 ## What changed in this PR
 
@@ -14,8 +14,8 @@ Use this guide **once** when updating an Agentic NixOS machine from a version be
 
 ## Upgrade from the old checkout
 
-1. On the deployment computer, update the *same* Git checkout with `git pull --ff-only origin main` as described in [update step 1](update.md#1-update-the-local-repository). Confirm `.deployment/` still contains the original `flake.lock`, generated machine files and target. Check the changed paths if you use custom scripts: the new operator commands live under `scripts/install/`, `scripts/update/`, and `scripts/github/`.
-2. Follow [update steps 2–5](update.md#2-check-the-machine-and-private-deployment-state). Verify `agentic-skills.service` succeeded and the new `~/.pi/agent/skills/agentic` directory contains the selected links. The old `mattpocock` link may now cause duplicates (including skills you disable later); **leave it until the new skills work**.
+1. On the deployment computer, update the *same* Git checkout with `git pull --ff-only origin main` as described in [update step 1](../update.md#1-update-the-local-repository). Confirm `.deployment/` still contains the original `flake.lock`, generated machine files and target. Check the changed paths if you use custom scripts: the new operator commands live under `scripts/install/`, `scripts/update/`, and `scripts/github/`.
+2. Follow [update steps 2–5](../update.md#2-check-the-machine-and-private-deployment-state). Verify `agentic-skills.service` succeeded and the new `~/.pi/agent/skills/agentic` directory contains the selected links. The old `mattpocock` link may now cause duplicates (including skills you disable later); **leave it until the new skills work**.
 3. On the server as `agentic`, inspect both paths:
 
    ```bash

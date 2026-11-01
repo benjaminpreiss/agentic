@@ -6,7 +6,7 @@ This guide sets up a GitHub App for sandboxed Pi: the official MCP server provid
 
 ## 1. Create and install the App
 
-[Open the prefilled registration form](https://github.com/settings/apps/new?name=agentic-workbox&description=Sandboxed%20coding%20agents%20with%20gated%20merges&url=https%3A%2F%2Fgithub.com%2Fbenjaminpreiss%2Fagentic&public=false&webhook_active=false&request_oauth_on_install=false&contents=write&pull_requests=read&issues=read&actions=read&checks=read&statuses=read), or edit an existing App in [GitHub App settings](https://github.com/settings/apps). Choose a **private App**, disable webhooks and OAuth on installation, and confirm these repository permissions:
+Create or edit a GitHub App in [GitHub App settings](https://github.com/settings/apps). Choose an App name and homepage URL for **your own organization or repository**. Make it **private**, disable webhooks and OAuth on installation, and confirm these repository permissions:
 
 | Permission | Level |
 | --- | --- |
@@ -16,11 +16,11 @@ This guide sets up a GitHub App for sandboxed Pi: the official MCP server provid
 | Metadata | Read-only (automatic) |
 | Workflows, Administration, Secrets, Environments | No access |
 
-Install it on **Only select repositories**, starting with `benjaminpreiss/agentic`. On the App's General page, record its **App ID**, download a private key (`.pem`), and record the **installation ID**. Never paste the key into chat or commit it. One App can cover several repositories/installations; the MCP server uses the configured installation ID, while Git looks up the installation for each repository. Multiple different Apps at once are not supported.
+Install it on **Only select repositories**, starting with the repository you want the agent to work on. On the App's General page, record its **App ID**, download a private key (`.pem`), and record the **installation ID**. Never paste the key into chat or commit it. One App can cover several repositories/installations; the MCP server uses the configured installation ID, while Git looks up the installation for each repository. Multiple different Apps at once are not supported.
 
 ## 2. Protect the default branch
 
-In each repository, use **Settings → Rules → Rulesets** and follow [the recommended rulesets](recommended-rulesets.md). Confirm the App has **no bypass privileges**. GitHub rulesets cannot require approval from *benjaminpreiss* specifically; enforcing a particular reviewer's identity would require a separate trusted merge service.
+In each repository, use **Settings → Rules → Rulesets** and follow [the recommended rulesets](recommended-rulesets.md). Confirm the App has **no bypass privileges**. GitHub rulesets cannot require approval from a particular named reviewer; enforcing a specific reviewer's identity would require a separate trusted merge service.
 
 ## 3. Prepare private credentials locally
 

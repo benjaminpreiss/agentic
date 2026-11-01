@@ -25,7 +25,7 @@ Pi's `suppress_save_prompt: ["/"]` prevents denied paths from being offered for 
 
 ## Select installed skills
 
-Reviewed, versioned skills live in [`skills/available/`](../skills/available/); links in [`skills/enabled/`](../skills/enabled/) select which ones NixOS installs. Remove a link to disable a skill without deleting its source. Stage again with `bash scripts/test-stage.sh` to check links before applying an [update](update.md). Broken or escaping links fail staging; user-managed skills outside the dedicated `~/.pi/agent/skills/agentic` directory are not overwritten. Existing machines may need [manual cleanup of the previous skills symlink](skills-migration.md) to avoid duplicates. Imported Matt Pocock skills are enabled by default; see [their provenance](../skills/available/mattpocock/IMPORT.md) and [the selection decision](adr/0001-select-skills-with-checked-in-symlinks.md).
+Reviewed, versioned skills live in [`skills/available/`](../skills/available/); links in [`skills/enabled/`](../skills/enabled/) select which ones NixOS installs. Remove a link to disable a skill without deleting its source. Stage again with `bash scripts/test-stage.sh` to check links before applying an [update](update.md). Broken or escaping links fail staging; user-managed skills outside the dedicated `~/.pi/agent/skills/agentic` directory are not overwritten. Imported Matt Pocock skills are enabled by default; see [their provenance](../skills/available/mattpocock/IMPORT.md) and [the selection decision](adr/0001-select-skills-with-checked-in-symlinks.md).
 
 ## What the wrappers do—and do not protect
 

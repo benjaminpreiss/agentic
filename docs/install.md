@@ -4,7 +4,18 @@ Use this guide to replace the operating system on a remote machine. **Installati
 
 ## 1. Check prerequisites
 
-On your Mac or Linux deployment computer, use this repository checkout with Bash, SSH and Nix with flakes enabled. Have the target's SSH address, a local public SSH key and a provider console ready. The target must be reachable by SSH with root or passwordless sudo; the installer uses `nixos-anywhere`. Back up all data **off the target** and verify that you can recover it. Keep this checkout private: `.deployment/` will contain machine settings and a password hash, and `secrets/` may contain private keys. Both are Git-ignored.
+**Deployment computer (Mac or Linux)**
+
+- This repository checkout, Bash and SSH.
+- Nix with flakes enabled. We recommend [Determinate Nix](https://docs.determinate.systems/determinate-nix/) for installation; the scripts use Nix to run `nixos-anywhere` and other tools, so you do not need to install those separately.
+- A local SSH public key for the new machine.
+
+**Target machine**
+
+- An x86_64 machine accessible over SSH as root or with passwordless sudo, with a provider's out-of-band console you can use if networking fails.
+- An identified **whole disk** that can be erased. The install workflow queries its disk, boot and network settings; do not assume the defaults are correct.
+
+**Before you start:** back up all data **off the target** and verify recovery. Keep the checkout private: `.deployment/` will contain machine settings and a password hash, and `secrets/` may contain private keys. Both are Git-ignored.
 
 ## 2. Discover the target and select the disk
 
@@ -54,8 +65,8 @@ The installer reruns preflight and requires you to type `ERASE-AND-INSTALL-NIXOS
 ## 6. Verify the first boot
 
 1. If the machine was reinstalled, verify its **new SSH host-key fingerprint through the provider console** before updating `known_hosts`. Confirm you can connect as `agentic` with your key.
-2. On the machine, run `journalctl -u agentic-firstboot-check -b --no-pager`; check networking and SSH. From `~/work`, test `pi --version` and `omp --version`.
+2. On the machine, run `journalctl -u agentic-firstboot-check -b --no-pager`; check networking and SSH. For harness-specific use and verification, see [sandbox and skills](sandbox.md).
 3. Test the `recovery` account password at the provider's out-of-band console. Keep that path available until networking is stable.
 4. Keep `.deployment/generated/machine.nix`, `.deployment/generated/facter.json`, `.deployment/flake.lock` and the rest of `.deployment/` privately on the deployment computer for [future updates](update.md). Back them up off-server.
 
-If a launcher reports a missing nono pack, use the [non-destructive update](update.md), not the installer. See [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md) for next steps.
+If a post-install service needs repair, use the [non-destructive update](update.md), not the disk installer. See [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md) for feature-specific steps.

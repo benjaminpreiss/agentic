@@ -1,23 +1,38 @@
 # Agentic
 
-A modular repository for building and maintaining an agentic machine. It brings together NixOS deployment, GitHub remote access and protection checks, sandboxed agents, and versioned skills. Pi and Oh My Pi are the current agent integrations, not the limits of the project. Installation and updates are scripted today; the layout keeps these responsibilities separate as deployment automation grows.
+A composable repository for building and maintaining an agentic machine. It brings together NixOS deployment, Git remote access and protection, sandboxing, and versioned skills. More harnesses and integrations can be added without changing the install/update boundary.
 
-## Choose a task
+## What is supported today
 
-| Task | Guide | Safety boundary |
-| --- | --- | --- |
-| Install NixOS on a new machine | [Install](docs/install.md) | **Erases the confirmed disk** using Disko. |
-| Change an existing NixOS machine | [Update](docs/update.md) | Switches NixOS over SSH; **never runs Disko**. |
-| Set up GitHub access and branch protections | [GitHub App](docs/github-app.md) | Private keys stay outside the flake and agent sandboxes. |
-| Run sandboxed agents and select skills | [Sandbox and skills](docs/sandbox.md) | Only checked-in enabled skills are installed. |
-| Upgrade a machine installed before PR #28 | [Upgrade notes](docs/skills-migration.md) | Existing skills are not removed automatically. |
+### 🤖 Agent harnesses
+
+- [Pi and Oh My Pi](docs/sandbox.md), launched through sandbox wrappers. Other harnesses can be added later.
+
+### 🔗 Git remotes and safeguards
+
+- [GitHub App](docs/github-app.md) authentication for MCP reads and Git HTTPS pushes, with [branch protection guidance](docs/recommended-rulesets.md) and scheduled, read-only constraint audits. Approval-gated merge automation is **not** implemented.
+
+### 🛡️ Sandboxes
+
+- [nono](docs/sandbox.md) profiles for the current harnesses; private GitHub App credentials stay on the host.
+
+### 🧩 Skills
+
+- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). Checked-in links under `skills/enabled/` select what NixOS installs; see the [decision record](docs/adr/0001-select-skills-with-checked-in-symlinks.md).
+
+### 🖥️ Machine deployment
+
+- [Fresh NixOS installation](docs/install.md) with nixos-anywhere and Disko (**erases the selected disk**).
+- [Non-destructive updates](docs/update.md) via NixOS rebuild over SSH (**no Disko**). These workflows are scripted today; the repo structure leaves room for deployment automation.
+
+> **Upgrading a machine from before PR #28?** Follow the [PR #28 action-required upgrade notes](docs/upgrades/PR-28-ACTION-REQUIRED.md) after the update. The previous skills link is not removed automatically.
 
 ## Repository map
 
 - `nixos/`: flake, system modules and local nono profiles.
-- `scripts/install/`, `scripts/update/`: operator workflows. Both use `scripts/stage.sh` to build the credential-free deployment source.
+- `scripts/install/`, `scripts/update/`: operator workflows. Both use `scripts/stage.sh` to build credential-free deployment source.
 - `scripts/runtime/`, `scripts/github/`, `github-protection/`: host-side GitHub credentials, setup and protection audits.
-- `skills/available/`: reviewed, versioned skills. Checked-in links under `skills/enabled/` are the sole installation selection; see the [decision record](docs/adr/0001-select-skills-with-checked-in-symlinks.md).
-- `docs/`: task guides, security guidance and decisions.
+- `skills/available/`, `skills/enabled/`: versioned skills and the sole installation selection.
+- `docs/`: task guides, security guidance, upgrade notes and decisions.
 
 `.deployment/` holds generated machine configuration and the Nix lock file. Keep it privately for updates; it is Git-ignored. `secrets/` holds local GitHub App credentials and is also Git-ignored. **Never commit either, put secrets in Nix expressions, or copy the key into the Nix store.** Unattended NixOS upgrades are disabled.
