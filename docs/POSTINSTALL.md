@@ -1,9 +1,9 @@
 # After NixOS installation
 
-1. Confirm you can SSH with your configured public key. On reinstallation, the server SSH host key changes; verify its new fingerprint through a trusted console before updating known_hosts.
-2. Review `.deployment/generated/facter.json` and keep this report with the machine's durable configuration; ensure future rebuilds refer to the report and same flake lock.
-3. Set up Pi (`@earendil-works/pi-coding-agent`), nono with `nolabs-ai/pi`, Herdr/`hc`, and Matt Pocock skills. This initial bundle does **not** configure them yet. The installed `nnpi` launcher is a guard/placeholder until those tools and the profile exist.
-4. For Herdr and nono extension loading, retain `JITI_FS_CACHE=false` and keep work within `~/work`.
-5. Configure the GitHub App / MCP service separately, outside the nono sandbox, with systemd credentials or agenix/sops-nix. Do not commit private keys.
-6. Protect `main` using GitHub branch rulesets; only allow autonomous PR merges into `agentic` after testing enforcement.
-7. Review NixOS update policy before enabling unattended rebuilds. Backups stored on the same disk are insufficient for disaster recovery.
+1. Confirm you can SSH as `agentic` with your configured public key. On reinstallation, the server SSH host key changes; verify its new fingerprint through a trusted console before updating `known_hosts`.
+2. Test logging in as `recovery` through the provider console. Keep this path available until remote access is stable.
+3. Keep `.deployment/generated/facter.json`, `.deployment/generated/machine.nix`, and `.deployment/flake.lock` with your private deployment records; future updates use these files.
+4. Check `journalctl -u agentic-firstboot-check -b --no-pager` and verify networking and SSH. See the first-boot checks in [the README](../README.md#5-verify-the-first-boot).
+5. From `~/work`, try `pi` and `omp`. The NixOS modules declare the launchers, nono, Herdr, and skills; the nono registry packs are prepared by `scripts/apply.sh`, not the fresh installer. If a launcher reports a missing pack after installation, follow the non-destructive [update instructions](APPLY-EXISTING-NIXOS.md). See [SANDBOXED-AGENTS.md](SANDBOXED-AGENTS.md) for sandbox details.
+6. If you need GitHub App-backed MCP and Git HTTPS credentials, follow [the GitHub setup guide](../AGENTIC_GITHUB_SETUP.md). Keep the private key outside `.deployment/` and the Nix store.
+7. Protect important GitHub branches before autonomous pushes or merges. Backups stored on the server are not a substitute for off-server backups; unattended NixOS system upgrades are disabled.

@@ -160,8 +160,8 @@ in {
     if [[ "$TERM" == xterm-ghostty ]] && ! ${pkgs.ncurses}/bin/infocmp xterm-ghostty >/dev/null 2>&1; then
       export TERM=xterm-256color
     fi
-    if [[ "$(id -un)" == agentic && -z "''${NNPI_WELCOME_SHOWN:-}" && -z "''${NNPI_NO_WELCOME:-}" ]]; then
-      export NNPI_WELCOME_SHOWN=1
+    if [[ "$(id -un)" == agentic && -z "''${AGENTIC_WELCOME_SHOWN:-}" && -z "''${AGENTIC_NO_WELCOME:-}" ]]; then
+      export AGENTIC_WELCOME_SHOWN=1
       ${status}/bin/agentic-status
     fi
   '';

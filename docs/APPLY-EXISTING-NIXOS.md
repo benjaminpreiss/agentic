@@ -1,35 +1,31 @@
-# Apply Agentic NixOS shell and dashboard fixes
+# Update an existing Agentic NixOS machine
 
-These changes are for an **already installed, SSH-reachable NixOS machine**. Do **not** run `scripts/deploy.sh --install` again. The Disko installation command erases the disk.
+Use `scripts/apply.sh` for an **already installed, SSH-reachable NixOS machine**. Do **not** rerun `scripts/deploy.sh --install`: the Disko installation command erases the selected disk.
 
-## Changed files
+## Before applying
 
-- Replace `modules/agentic.nix`: Ghostty terminfo, initialize missing `~/.zshrc`, Starship prompt, welcome screen, firewall allowances, existing backup timer.
-- Add `scripts/apply.sh`: copy updated modules to `.deployment`, evaluate final configuration, and run a remote `nixos-rebuild switch` (no repartitioning).
-- Add this document.
+- Keep the working `.deployment/` directory, including `generated/machine.nix`, `generated/facter.json`, and `flake.lock`. The machine configuration records your disk, boot mode, MAC-based network settings, and SSH key.
+- Confirm that SSH to `root@YOUR_HOST` still works and that you have a provider-console recovery path.
+- Review your source changes and any credentials separately. `scripts/apply.sh` evaluates the system before asking for confirmation; it does not repartition or format disks.
 
-The remaining files from your currently working deployment are unchanged. In particular, keep your working MAC-address network configuration, BIOS boot setup, recovery account and machine-specific `.deployment` configuration.
+From the repository root on your deployment computer:
 
-## Apply from your Mac
+```bash
+bash scripts/apply.sh
+```
 
-1. Replace/add the files in your local `agentic-main` directory. There is no need to commit them before applying.
-2. Ensure `.deployment/generated/facter.json`, `.deployment/generated/machine.nix` and `.deployment/flake.nix` exist from your successful install.
-3. Test that SSH works: `ssh root@YOUR_HOST 'cat /etc/os-release'`.
-4. Run `bash scripts/apply.sh` from the repository directory.
-5. Reconnect using `ssh agentic@YOUR_HOST`. The Zsh first-time wizard should not appear, and the welcome banner should describe the firewall allow rules, not listening sockets.
+The helper refreshes its selected NixOS modules, flake, runtime scripts, and nono profiles in `.deployment/`, evaluates the system, prompts for confirmation, and runs a remote `nixos-rebuild switch`. Review the files it copies when adding new modules or scripts; this is not yet a complete source sync. If local GitHub App credentials are present in `secrets/github-app/`, they are transmitted separately over SSH to root-owned files on the target; they are never added to the Nix flake source. After activation, the helper prepares and verifies the nono packs and profiles as `agentic`.
 
-The helper updates your local `.deployment/modules/{agentic,base}.nix` and uses remote NixOS evaluation/build/activation. The current OS may be kept on NixOS 26.05; moving to a stable release is a separate, deliberate upgrade, not part of this repair.
+Reconnect as `agentic` and check the updated services and sandboxed tools:
 
-If the rebuild fails, the old NixOS generation remains available. Do not run the disk installer to fix a rebuild problem.
+```bash
+ssh agentic@YOUR_HOST
+cd ~/work
+pi --version
+omp --version
+systemctl status agentic-backup.timer --no-pager
+```
 
-## What this does not install
+The installed `pi` and `omp` commands are nono sandbox launchers; see [SANDBOXED-AGENTS.md](SANDBOXED-AGENTS.md). For GitHub App configuration and verification, see [the GitHub setup guide](../AGENTIC_GITHUB_SETUP.md).
 
-The current baseline does **not** yet install Pi, nono, Herdr, Herdr Core, Matt Pocock skills or GitHub MCP. `nnpi` is a prepared launcher and reports a missing executable until those components are provisioned. Do not assume the remaining Ubuntu provisioning has automatically migrated.
-
-OS upgrade automation is also not enabled here: configuration is currently installed from a local generated flake. Backups still run daily, but are **local to the server** and not a substitute for off-server backups.
-
-## Additional hardening notes
-
-`programs.zsh.interactiveShellInit` already loads the dashboard even in a non-login interactive shell. The activation script only creates `~/.zshrc` if missing; it does not overwrite a user's existing file. The `ghostty.terminfo` package supplies `xterm-ghostty` capabilities.
-
-Displayed firewall values are global NixOS allow-list settings; there may be other per-interface or service-specific allowances. Inspect `sudo nft list ruleset` on the target for effective runtime rules.
+If the rebuild fails, preserve the known-good NixOS generation and investigate the failure. Do not run the fresh installer as a repair step. Backups are **local to the server**, not a substitute for off-server backups. Unattended NixOS system upgrades are disabled.
