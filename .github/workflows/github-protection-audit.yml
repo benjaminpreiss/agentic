@@ -1,0 +1,21 @@
+name: GitHub protection policy tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - github-protection/**
+      - .github/workflows/github-protection-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate audit code and policy without App credentials
+        run: bash github-protection/test.sh

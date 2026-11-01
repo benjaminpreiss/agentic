@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# Validate credential-free Git provisioning before staging or switching NixOS.
+bash "$ROOT/scripts/test-configure-git-credentials.sh"
 DEPLOY="$ROOT/.deployment"
 for f in flake.nix flake.lock generated/machine.nix generated/facter.json target.txt; do
   [[ -f "$DEPLOY/$f" ]] || { echo "Missing .deployment/$f" >&2; exit 1; }
@@ -16,6 +18,10 @@ for f in flake.nix modules/base.nix modules/agentic.nix modules/github-mcp.nix \
   [[ -f "$ROOT/$f" ]] || { echo "Missing $f" >&2; exit 1; }
   cp "$ROOT/$f" "$DEPLOY/$f"
 done
+# github-mcp.nix embeds this pinned, credential-free audit code in the Nix
+# store. Stage the exact sources it references before evaluating the flake;
+# never copy secrets/github-app into .deployment.
+bash "$ROOT/scripts/stage-github-protection.sh" "$DEPLOY"
 # Local nono profiles are part of the flake source too.
 mkdir -p "$DEPLOY/profiles"
 for f in pi-herdr.json omp-agentic.json; do

@@ -5,7 +5,7 @@ Use `scripts/apply.sh` for an **already installed, SSH-reachable NixOS machine**
 ## Before applying
 
 - Keep the working `.deployment/` directory, including `generated/machine.nix`, `generated/facter.json`, and `flake.lock`. The machine configuration records your disk, boot mode, MAC-based network settings, and SSH key.
-- Confirm that SSH to `root@YOUR_HOST` still works and that you have a provider-console recovery path.
+- Confirm that SSH to `root@YOUR_HOST` still works and that you have a hosting provider's out-of-band web/serial console recovery path.
 - Review your source changes and any credentials separately. `scripts/apply.sh` evaluates the system before asking for confirmation; it does not repartition or format disks.
 
 From the repository root on your deployment computer:

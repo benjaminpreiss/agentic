@@ -42,6 +42,14 @@ let
   tcpPorts = config.networking.firewall.allowedTCPPorts;
   udpPorts = config.networking.firewall.allowedUDPPorts;
   formatPorts = ports: if ports == [] then "none" else lib.concatStringsSep ", " (map toString ports);
+  auditReport = pkgs.writeShellScriptBin "agentic-github-protection-report" ''
+    report=/var/lib/agentic-github-protection/report
+    if [ ! -r "$report" ]; then
+      echo 'No readable GitHub protection audit report yet.' >&2
+      exit 1
+    fi
+    ${pkgs.coreutils}/bin/cat -- "$report"
+  '';
   status = pkgs.writeShellScriptBin "agentic-status" ''
     echo 'AGENTIC WORKSPACE'
     echo '  Workspace: ~/work'
@@ -58,6 +66,26 @@ let
     echo
     echo 'MAINTENANCE'
     ${pkgs.systemd}/bin/systemctl list-timers --no-pager agentic-backup.timer 2>/dev/null || true
+    echo
+    echo 'GITHUB PROTECTION AUDIT'
+    audit_status=/var/lib/agentic-github-protection/status
+    if [ -r "$audit_status" ]; then
+      checked="$(${pkgs.gawk}/bin/awk -F= '$1 == "checked_at" {print $2; exit}' "$audit_status")"
+      result="$(${pkgs.gawk}/bin/awk -F= '$1 == "result" {print $2; exit}' "$audit_status")"
+      summary="$(${pkgs.gawk}/bin/awk -F= '$1 == "summary" {sub(/^[^=]*=/, ""); print; exit}' "$audit_status")"
+      now="$(${pkgs.coreutils}/bin/date -u +%s)"
+      if [[ "$checked" =~ ^[0-9]+$ && "$result" =~ ^(PASS|FAIL)$ ]] &&
+         (( checked <= now && now - checked < 172800 )); then
+        printf '  %s: %s\n' "$result" "$summary"
+        printf '  Checked: %s UTC\n' "$(${pkgs.coreutils}/bin/date -u -d "@$checked" '+%Y-%m-%d %H:%M')"
+      else
+        echo '  STALE: no recent valid audit result (older than 48 hours)'
+      fi
+    else
+      echo '  NOT RUN: no audit status yet'
+    fi
+    echo '  Details: agentic-github-protection-report (no sudo)'
+    echo '  Run now: sudo systemctl start agentic-github-protection-audit.service'
     echo
     echo 'FIREWALL (DECLARED GLOBAL ALLOW RULES)'
     echo '  Firewall enabled: ${if config.networking.firewall.enable then "yes" else "no"}'
@@ -97,7 +125,7 @@ in {
   imports = [ ./github-mcp.nix ];
   # Do not expose the raw agent packages on the system PATH: command discovery
   # must find the sandbox launchers, not an unsandboxed binary.
-  environment.systemPackages = [ sandboxedPi sandboxedOmp status backup pkgs.ghostty.terminfo nonoPkg herdrPkg ];
+  environment.systemPackages = [ sandboxedPi sandboxedOmp status auditReport backup pkgs.ghostty.terminfo nonoPkg herdrPkg ];
 
   # Pi discovers recursively under ~/.pi/agent/skills. Install skills via
   # a read-only symlink to the pinned flake source; never mutate the Nix store.

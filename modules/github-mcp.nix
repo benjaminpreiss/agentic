@@ -33,6 +33,42 @@ let
       mainProgram = "github-mcp-server";
     };
   };
+  # The audit runs from the pinned Nix store, outside the coding-agent sandbox.
+  # The PEM and App IDs are passed only to this service through systemd credentials.
+  protectionAudit = pkgs.writeShellApplication {
+    name = "agentic-github-protection-audit";
+    runtimeInputs = with pkgs; [ bash curl jq openssl coreutils gnused gnugrep ];
+    text = ''
+      umask 077
+      state=/var/lib/agentic-github-protection
+      tmp="$(mktemp "$state/.status.XXXXXXXX")"
+      report_tmp="$(mktemp "$state/.report.XXXXXXXX")"
+      trap 'rm -f "$tmp" "$report_tmp"' EXIT
+      checked="$(date -u +%s)"
+      if output="$(AGENTIC_GITHUB_SECRETS_DIR="''${CREDENTIALS_DIRECTORY:?}" ${pkgs.bash}/bin/bash ${../github-protection}/check.sh 2>&1)"; then
+        result=PASS
+      else
+        result=FAIL
+      fi
+      printf '%s\n' "$output"
+      summary="$(printf '%s\n' "$output" | grep '^Summary:' | tail -n 1 || true)"
+      summary="''${summary:-Audit failed before summary}"
+      # Persist only audit-authored findings and the summary, not raw stderr,
+      # HTTP responses, or credentials. Publish the report before its status.
+      printf 'GitHub protection audit: %s\nChecked: %s UTC\n\n' "$result" "$(date -u -d "@$checked" '+%Y-%m-%d %H:%M')" > "$report_tmp"
+      while IFS= read -r line; do
+        case "$line" in
+          '📦 '*|'  ✅ '*|'  ⚠️  '*|'  ❌ '*|'Summary: '*|'ERROR: '*) printf '%s\n' "$line" >> "$report_tmp" ;;
+        esac
+      done <<< "$output"
+      chmod 0644 "$report_tmp"
+      mv -f "$report_tmp" "$state/report"
+      printf 'checked_at=%s\nresult=%s\nsummary=%s\n' "$checked" "$result" "$summary" > "$tmp"
+      chmod 0644 "$tmp"
+      mv -f "$tmp" "$state/status"
+      [[ "$result" == PASS ]]
+    '';
+  };
   gitSocketPath = "/run/agentic-git-credentials.sock";
   # This process runs outside nono. Only a per-repository installation token,
   # never the PEM, crosses the socket into Git. One App may have many installations.
@@ -79,6 +115,37 @@ let
     '';
   };
 in {
+  systemd.services.agentic-github-protection-audit = {
+    description = "Read-only protection audit for all repositories in the GitHub App installation";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      LoadCredential = [
+        "app.env:/etc/agentic/github-app/app.env"
+        "private-key.pem:/etc/agentic/github-app/private-key.pem"
+      ];
+      StateDirectory = "agentic-github-protection";
+      StateDirectoryMode = "0755";
+      ExecStart = "${protectionAudit}/bin/agentic-github-protection-audit";
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectControlGroups = true;
+      RestrictSUIDSGID = true;
+      LockPersonality = true;
+      CapabilityBoundingSet = "";
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+    };
+  };
+  systemd.timers.agentic-github-protection-audit = {
+    description = "Daily GitHub protection audit";
+    wantedBy = [ "timers.target" ];
+    timerConfig = { OnCalendar = "*-*-* 03:00:00"; RandomizedDelaySec = "15min"; Persistent = true; };
+  };
   # The listener is owned by systemd, not by Pi. Each accepted connection
   # spawns a dedicated official github-mcp-server stdio process.
   systemd.sockets.agentic-github-mcp = {
@@ -157,7 +224,7 @@ in {
     };
   };
   systemd.services.agentic-configure-git-credentials = {
-    description = "Configure agentic Git credential helper for GitHub HTTPS repositories";
+    description = "Configure agentic Git credential helper and author identity";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-tmpfiles-setup.service" ];
     serviceConfig = {
