@@ -3,7 +3,7 @@
 # Effective rules do not expose reviewer identity or App bypass permissions.
 . as $rules
 | [.[] | select(.type == "pull_request")] as $prs
-| if $branch != $default_branch then
+| (if $branch != $default_branch then
     [{status: (if ($prs | length) == 0 then "ok" else "fail" end),
       message: "work branch permits direct pushes (no PR rule)"}]
   else [
@@ -30,10 +30,10 @@
       {status: "ok", message: "dismisses stale approvals after new commits"}
     else
       {status: "fail", message: "must dismiss stale approvals after new commits"}
-    end),
-
+    end)
+  ] end) + [
     {status: (if any($rules[]; .type == "non_fast_forward") then "ok" else "fail" end),
      message: "blocks force pushes"},
     {status: (if any($rules[]; .type == "deletion") then "ok" else "fail" end),
      message: "blocks deletion"}
-  ] end
+  ]

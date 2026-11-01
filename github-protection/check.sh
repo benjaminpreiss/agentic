@@ -52,7 +52,7 @@ check_effective() {
 }
 
 audit_repo() {
-  local repo="$1" results default_branch default_sha branch work_sample=''
+  local repo="$1" results default_branch default_sha encoded_default branch work_sample=''
   [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'ERROR: invalid repository identifier' >&2; exit 2; }
   printf '\n📦 %s\n' "$repo"
   if ! api GET "$API/repos/$repo" "$token"; then
@@ -62,6 +62,7 @@ audit_repo() {
   fi
   default_branch="$(jq -r '.default_branch // empty' <<<"$BODY")"
   if [[ -z "$default_branch" ]]; then fail 'repository metadata: missing default branch'; return; fi
+  encoded_default="$(jq -rn --arg v "$default_branch" '$v|@uri')"
   if load_rulesets "$repo"; then
     if results="$(jq -c --argjson app_id "$APP_ID" -f "$POLICY_DIR/rulesets.jq" <<<"$details")"; then
       report 'rulesets' "$results" || true
@@ -69,7 +70,7 @@ audit_repo() {
   fi
 
   # The repository's actual default branch supplies CI requirements.
-  if ! api GET "$API/repos/$repo/branches/$default_branch" "$token"; then
+  if ! api GET "$API/repos/$repo/branches/$encoded_default" "$token"; then
     fail "$default_branch: branch API transport error"
   elif [[ "$STATUS" != 200 ]]; then
     fail "$default_branch: branch HTTP $STATUS"

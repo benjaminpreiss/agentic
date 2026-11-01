@@ -6,8 +6,12 @@
     .enforcement == "active" and .target == "branch" and
     .conditions.ref_name.include == ["~DEFAULT_BRANCH"] and
     .conditions.ref_name.exclude == [];
+  def all_branches:
+    .enforcement == "active" and .target == "branch" and
+    .conditions.ref_name.include == ["~ALL"] and
+    .conditions.ref_name.exclude == [];
   def has_rule($kind):
-    any($sets[]; default_only and any(.rules[]?; .type == $kind));
+    any($sets[]; all_branches and any(.rules[]?; .type == $kind));
   [
     (if any($sets[]; default_only and any(.rules[]?;
          .type == "pull_request" and .parameters.allowed_merge_methods == ["squash"])) then
@@ -24,11 +28,11 @@
        {status:"fail", message:"PR rule outside default branch may block direct pushes to work branches"}
      else {status:"ok", message:"no PR rules target work branches"} end),
     (if has_rule("non_fast_forward") then
-       {status:"ok", message:"default branch blocks force pushes"}
-     else {status:"fail", message:"cannot prove default branch blocks force pushes"} end),
+       {status:"ok", message:"all branch names block force pushes"}
+     else {status:"fail", message:"cannot prove all branch names block force pushes"} end),
     (if has_rule("deletion") then
-       {status:"ok", message:"default branch blocks deletion"}
-     else {status:"fail", message:"cannot prove default branch blocks deletion"} end),
+       {status:"ok", message:"all branch names block deletion"}
+     else {status:"fail", message:"cannot prove all branch names block deletion"} end),
     (if any($sets[]; .enforcement == "active" and
         any(.bypass_actors[]?; .actor_type == "Integration" and .actor_id == $app_id)) then
        {status:"fail", message:"App appears as a bypass actor in an active ruleset"}
