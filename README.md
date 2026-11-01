@@ -6,11 +6,12 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 ### 🤖 Agent harnesses
 
-- [Pi and Oh My Pi](docs/sandbox.md), launched through sandbox wrappers. Other harnesses can be added later.
+- [Pi](docs/sandbox.md), launched through a nono sandbox wrapper.
+- [Oh My Pi](docs/sandbox.md), launched through its own nono sandbox wrapper. Other harnesses can be added later.
 
 ### 🔗 Git remotes and safeguards
 
-- [GitHub App](docs/github-app.md) authentication for MCP reads and Git HTTPS pushes, with [branch protection guidance](docs/recommended-rulesets.md) and scheduled, read-only constraint audits. Approval-gated merge automation is **not** implemented.
+- **GitHub:** [App-backed access](docs/github-app.md) for MCP reads and Git HTTPS pushes, [branch protection guidance](docs/recommended-rulesets.md), and scheduled read-only constraint audits. Approval-gated merge automation is **not** implemented.
 
 ### 🛡️ Sandboxes
 
@@ -24,8 +25,6 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 - [Fresh NixOS installation](docs/install.md) with nixos-anywhere and Disko (**erases the selected disk**).
 - [Non-destructive updates](docs/update.md) via NixOS rebuild over SSH (**no Disko**). These workflows are scripted today; the repo structure leaves room for deployment automation.
-
-> **Upgrading a machine from before PR #28?** Follow the [PR #28 action-required upgrade notes](docs/upgrades/PR-28-ACTION-REQUIRED.md) after the update. The previous skills link is not removed automatically.
 
 ## Repository map
 

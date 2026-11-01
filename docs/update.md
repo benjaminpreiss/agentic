@@ -14,6 +14,8 @@ git pull --ff-only origin main
 
 Stop if Git reports local conflicts, a non-fast-forward history, or uncommitted changes you have not reviewed. Do **not** reset, clean or delete `.deployment/` to make the pull work. If this is an archive rather than a Git checkout, obtain the new source without replacing or discarding the private `.deployment/` and `secrets/` directories; verify they remain in this checkout before applying. `git pull` changes tracked code, not Git-ignored machine records.
 
+**Before applying, check [`docs/upgrades/`](upgrades/) for action-required notes relevant to the changes you just pulled.** These one-time steps are kept separate from this routine update guide; follow any applicable note at the point it specifies (before or after the switch).
+
 ## 2. Check the machine and private deployment state
 
 Confirm root SSH and your provider's out-of-band console still work. Keep an off-server backup. Check that the existing deployment is intact:

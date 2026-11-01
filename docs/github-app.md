@@ -6,7 +6,13 @@ This guide sets up a GitHub App for sandboxed Pi: the official MCP server provid
 
 ## 1. Create and install the App
 
-Create or edit a GitHub App in [GitHub App settings](https://github.com/settings/apps). Choose an App name and homepage URL for **your own organization or repository**. Make it **private**, disable webhooks and OAuth on installation, and confirm these repository permissions:
+From the repository root, print a **prefilled registration link** for your GitHub repository and proposed App name:
+
+```bash
+bash scripts/github/print-app-registration-url.sh YOUR-OWNER/YOUR-REPO your-agent-app
+```
+
+Open the printed URL in a browser. It preselects the homepage, visibility, webhook/OAuth settings and permissions below; check each field before submitting. App names must be available on GitHub. You can also use the [unfilled registration form](https://github.com/settings/apps/new) or [edit an existing App](https://github.com/settings/apps). Choose a **private App**, disable webhooks and OAuth on installation, and confirm these repository permissions:
 
 | Permission | Level |
 | --- | --- |
