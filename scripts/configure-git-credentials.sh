@@ -8,7 +8,10 @@ expected_helper="$helper $socket"
 
 # Git config writes replace ~/.gitconfig. Avoid even a no-op write: running
 # nono sessions may hold an inode-bound read grant for the existing file.
-mapfile -t helpers < <(git config --global --get-all "$key" || true)
+helpers=()
+while IFS= read -r value; do
+  helpers+=("$value")
+done < <(git config --global --get-all "$key" || true)
 if (( ${#helpers[@]} != 2 )) || [[ ${helpers[0]} != "" || ${helpers[1]} != "$expected_helper" ]]; then
   git config --global --unset-all "$key" || true
   # An empty helper resets inherited helpers for this URL.
