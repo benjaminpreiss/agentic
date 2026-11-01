@@ -38,7 +38,8 @@ authenticate() {
   real_dir="$(cd -P "$SECRETS" && pwd)"
   case "$real_key" in "$real_dir"/*) ;; *) echo 'ERROR: active key must resolve inside secrets directory' >&2; return 2;; esac
   now="$(date +%s)"
-  header='eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9'
+  # Encode the JWT header from its declared algorithm/type, not an opaque blob.
+  header="$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | b64url)"
   payload="$(jq -cn --argjson iat "$((now-60))" --argjson exp "$((now+540))" --arg iss "$APP_ID" '{iat:$iat,exp:$exp,iss:$iss}' | b64url)"
   unsigned="$header.$payload"
   signature="$(printf %s "$unsigned" | openssl dgst -sha256 -sign "$real_key" | b64url)" || { echo 'ERROR: could not sign JWT' >&2; return 2; }
