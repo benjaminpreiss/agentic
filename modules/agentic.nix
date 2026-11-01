@@ -50,7 +50,7 @@ let
     fi
     ${pkgs.coreutils}/bin/cat -- "$report"
   '';
-  status = pkgs.writeShellScriptBin "agentic-status" '';
+  status = pkgs.writeShellScriptBin "agentic-status" ''
     echo 'AGENTIC WORKSPACE'
     echo '  Workspace: ~/work'
     echo '  Switch:    cd ~/work'
