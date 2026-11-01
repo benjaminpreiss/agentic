@@ -1,7 +1,7 @@
 # After NixOS installation
 
 1. Confirm you can SSH as `agentic` with your configured public key. On reinstallation, the server SSH host key changes; verify its new fingerprint through a trusted console before updating `known_hosts`.
-2. Test logging in as `recovery` through the provider console. Keep this path available until remote access is stable.
+2. Test the `recovery` password using your hosting provider's **out-of-band web or serial console** (not SSH). Keep that path available until remote access is stable. This account has password-protected `sudo` access: it can rescue a broken SSH or network configuration, but its standing password is another credential to protect and rotate. SSH password login stays disabled. Removing the account would need a different tested recovery path and changes to the installer; do not remove it as part of routine cleanup.
 3. Keep `.deployment/generated/facter.json`, `.deployment/generated/machine.nix`, and `.deployment/flake.lock` with your private deployment records; future updates use these files.
 4. Check `journalctl -u agentic-firstboot-check -b --no-pager` and verify networking and SSH. See the first-boot checks in [the README](../README.md#5-verify-the-first-boot).
 5. From `~/work`, try `pi` and `omp`. The NixOS modules declare the launchers, nono, Herdr, and skills; the nono registry packs are prepared by `scripts/apply.sh`, not the fresh installer. If a launcher reports a missing pack after installation, follow the non-destructive [update instructions](APPLY-EXISTING-NIXOS.md). See [SANDBOXED-AGENTS.md](SANDBOXED-AGENTS.md) for sandbox details.
