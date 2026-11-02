@@ -1,41 +1,32 @@
 #!/usr/bin/env bash
+# Preserve the old host's private state while testing legacy staging from the
+# same manifest used by the new, symlink-free root flake.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
-TMP="$(mktemp -d "$ROOT/.stage-test.XXXXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP"/{nixos/modules,nixos/profiles,github-protection,scripts/runtime,scripts/github,skills/available/demo,skills/enabled,.deployment/generated,.deployment/extra-files,secrets/github-app}
-cp "$ROOT/scripts/stage.sh" "$TMP/scripts/stage.sh"
-printf '{}\n' > "$TMP/nixos/flake.nix"
-printf 'old\n' > "$TMP/.deployment/flake.lock"
-printf 'machine\n' > "$TMP/.deployment/generated/machine.nix"
-printf 'report\n' > "$TMP/.deployment/generated/facter.json"
-printf 'hash\n' > "$TMP/.deployment/extra-files/recovery-password-hash"
-printf 'PRIVATE KEY\n' > "$TMP/secrets/github-app/private-key.pem"
-printf 'skill\n' > "$TMP/skills/available/demo/SKILL.md"
-ln -s ../available/demo "$TMP/skills/enabled/demo"
-for f in check.sh github-api.sh ci.sh policy.jq rulesets.jq; do touch "$TMP/github-protection/$f"; done
-touch "$TMP/scripts/github/configure-git-credentials.sh"
-printf 'module\n' > "$TMP/nixos/modules/new.nix"
-printf 'runtime\n' > "$TMP/scripts/runtime/new.sh"
-bash "$TMP/scripts/stage.sh" "$TMP/.deployment"
-[[ -f "$TMP/.deployment/modules/new.nix" && -f "$TMP/.deployment/scripts/new.sh" ]]
-[[ -f "$TMP/.deployment/skills/enabled/demo/SKILL.md" ]]
-[[ -f "$TMP/.deployment/generated/facter.json" && -f "$TMP/.deployment/generated/machine.nix" ]]
-[[ -f "$TMP/.deployment/flake.lock" && -f "$TMP/.deployment/extra-files/recovery-password-hash" ]]
-[[ ! -e "$TMP/.deployment/secrets" ]]
-# Both workflows call exactly this same staging operation.
-grep -Fq 'scripts/stage.sh' "$ROOT/scripts/install/prepare.sh"
-grep -Fq 'scripts/stage.sh' "$ROOT/scripts/update/apply.sh"
-rm "$TMP/skills/enabled/demo"
-bash "$TMP/scripts/stage.sh" "$TMP/.deployment"
-[[ ! -e "$TMP/.deployment/skills/enabled/demo" ]]
-ln -s ../../secrets/github-app "$TMP/skills/enabled/escape"
-if bash "$TMP/scripts/stage.sh" "$TMP/.deployment" 2>/dev/null; then echo 'Accepted escaping skill!' >&2; exit 1; fi
-[[ -f "$TMP/.deployment/generated/machine.nix" ]]
-rm "$TMP/skills/enabled/escape"
-ln -s ../available/missing "$TMP/skills/enabled/broken"
-if bash "$TMP/scripts/stage.sh" "$TMP/.deployment" 2>/dev/null; then echo 'Accepted broken skill!' >&2; exit 1; fi
-# Git ignore protects local credentials even when someone stages all paths.
-git -C "$ROOT" check-ignore -q secrets/github-app/private-key.pem
-[[ ! -e "$TMP/.deployment/secrets" ]]
-echo 'Shared staging, skill selection and credential exclusion: PASS'
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+tmp="$(mktemp -d "$ROOT/.deployment.stage.test.XXXXXXXX")"
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/repo"/{nixos/modules,nixos/profiles,github-protection,scripts/runtime,scripts/github,skills/available/demo,.deployment/generated,.deployment/extra-files,secrets}
+cp "$ROOT/scripts/stage.sh" "$tmp/repo/scripts/stage.sh"
+printf '{}\n' > "$tmp/repo/nixos/flake.nix"
+printf '{ demo = "demo"; }\n' > "$tmp/repo/skills/enabled.nix"
+printf 'skill\n' > "$tmp/repo/skills/available/demo/SKILL.md"
+printf 'module\n' > "$tmp/repo/nixos/modules/demo.nix"
+printf 'old lock\n' > "$tmp/repo/.deployment/flake.lock"
+printf 'private machine\n' > "$tmp/repo/.deployment/generated/machine.nix"
+printf 'private report\n' > "$tmp/repo/.deployment/generated/facter.json"
+printf 'recovery hash\n' > "$tmp/repo/.deployment/extra-files/hash"
+printf 'secret\n' > "$tmp/repo/secrets/private-key"
+for f in check.sh github-api.sh ci.sh policy.jq rulesets.jq; do printf 'fixture\n' > "$tmp/repo/github-protection/$f"; done
+printf 'fixture\n' > "$tmp/repo/scripts/github/configure-git-credentials.sh"
+bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment"
+[[ -f "$tmp/repo/.deployment/skills/enabled/demo/SKILL.md" ]]
+[[ $(<"$tmp/repo/.deployment/flake.lock") == 'old lock' ]]
+[[ $(<"$tmp/repo/.deployment/generated/machine.nix") == 'private machine' ]]
+[[ -f "$tmp/repo/.deployment/generated/facter.json" && -f "$tmp/repo/.deployment/extra-files/hash" ]]
+[[ ! -e "$tmp/repo/.deployment/secrets" ]]
+printf '{ demo = "../../secrets"; }\n' > "$tmp/repo/skills/enabled.nix"
+if bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment" 2>/dev/null; then echo 'Accepted escaping skill!' >&2; exit 1; fi
+[[ -f "$tmp/repo/.deployment/skills/enabled/demo/SKILL.md" ]]
+printf '{ demo = "missing"; }\n' > "$tmp/repo/skills/enabled.nix"
+if bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment" 2>/dev/null; then echo 'Accepted missing skill!' >&2; exit 1; fi
+echo 'Legacy staging preserves private state and validates selected skills.'

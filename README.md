@@ -19,19 +19,20 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 ### 🧩 Skills
 
-- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). Checked-in links under `skills/enabled/` select what NixOS installs; see the [decision record](docs/adr/0001-select-skills-with-checked-in-symlinks.md).
+- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). The checked-in, symlink-free [`skills/enabled.nix`](skills/enabled.nix) selects what NixOS installs; see the [decision record](docs/adr/0002-select-skills-with-a-manifest.md).
 
 ### 🖥️ Machine deployment
 
 - [Fresh NixOS installation](docs/install.md) with nixos-anywhere and Disko (**erases the selected disk**).
-- [Non-destructive updates](docs/update.md) via NixOS rebuild over SSH (**no Disko**). These workflows are scripted today; the repo structure leaves room for deployment automation.
+- [Non-destructive updates](docs/update.md): toolkit-managed hosts poll their operator-selected branch or stay pinned to a commit (**no Disko**). Existing hosts retain the manual SSH update until individually migrated.
 
 ## Repository map
 
-- `nixos/`: flake, system modules and local nono profiles.
-- `scripts/install/`, `scripts/update/`: operator workflows. Both use `scripts/stage.sh` to build credential-free deployment source.
+- `flake.nix`, `flake.lock`, `deployment/`: reviewed toolkit-managed flake, dependency pins and agentic-specific modules.
+- `nixos/`, `scripts/update/`, `scripts/stage.sh`: temporary legacy manual update path for existing hosts; do not remove before migration. `scripts/install/recovery-password.sh` only prepares a new host's private recovery hash.
+- `scripts/deployment/`: thin pinned-toolkit invoker, machine preparation and agentic-specific hooks.
 - `scripts/runtime/`, `scripts/github/`, `github-protection/`: host-side GitHub credentials, setup and protection audits.
-- `skills/available/`, `skills/enabled/`: versioned skills and the sole installation selection.
+- `skills/available/`, `skills/enabled.nix`: versioned skills and their reviewed selection.
 - `docs/`: task guides, security guidance, upgrade notes and decisions.
 
-`.deployment/` holds generated machine configuration and the Nix lock file. Keep it privately for updates; it is Git-ignored. `secrets/` holds local GitHub App credentials and is also Git-ignored. **Never commit either, put secrets in Nix expressions, or copy the key into the Nix store.** Unattended NixOS upgrades are disabled.
+`.deployment/` holds private machine facts and (for existing hosts only) their original lockfile; preserve it off-host and never commit it. New hosts use the committed root lockfile. `secrets/` holds local GitHub App credentials and is Git-ignored. **Never put private keys, hashes or tokens in Nix source or the store.** Only hosts explicitly bootstrapped and switched to branch tracking perform autonomous OS updates.

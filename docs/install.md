@@ -1,72 +1,64 @@
-# Install Agentic NixOS on a new machine
+# Install a new agentic NixOS host
 
-Use this guide to replace the operating system on a remote machine. **Installation repartitions and formats the selected entire disk. Existing partitions and on-disk backups will be lost.** For a machine already running Agentic NixOS, use the [update guide](update.md) instead.
+> **`install` destroys the selected whole disk.** Do not run these steps on an existing host. [Update and migration](update.md) never run Disko. Test on a disposable VM first; CI does not perform a real install.
 
-## 1. Check prerequisites
+## Before starting
 
-**Deployment computer (Mac or Linux)**
+- Review and push the exact agentic commit to install. Its root `flake.lock` pins Nixpkgs and the themoss.net toolkit. Verify the rescue host's SSH fingerprint through the provider console before connecting.
+- Back up all target data **off-server** and confirm console recovery. The operator machine needs Nix with flakes, SSH, jq, a public SSH key and a Linux Nix builder. The rescue host needs root SSH; the optional facter generator also requires Nix with flakes on the rescue host.
+- From this checkout, enter the toolkit's pinned operator shell (GNU tools on macOS):
 
-- This repository checkout, Bash and SSH.
-- Nix with flakes enabled. We recommend [Determinate Nix](https://docs.determinate.systems/determinate-nix/) for installation; the scripts use Nix to run `nixos-anywhere` and other tools, so you do not need to install those separately.
-- A local SSH public key for the new machine.
+  ```bash
+  toolkit=$(nix eval --raw --no-write-lock-file "path:$PWD#toolkitPath")
+  nix develop --no-write-lock-file "path:$toolkit#operator"
+  bash scripts/test-deployment.sh
+  ```
 
-**Target machine**
+  Mac operation has not been validated on a live server. Use a Linux VM with Nix if you cannot configure a Linux builder. Never put passwords, hashes, keys or App credentials in the flake source.
 
-- An x86_64 machine accessible over SSH as root or with passwordless sudo, with a provider's out-of-band console you can use if networking fails.
-- An identified **whole disk** that can be erased. The install workflow queries its disk, boot and network settings; do not assume the defaults are correct.
-
-**Before you start:** back up all data **off the target** and verify recovery. Keep the checkout private: `.deployment/` will contain machine settings and a password hash, and `secrets/` may contain private keys. Both are Git-ignored.
-
-## 2. Discover the target and select the disk
-
-From the repository root, run:
+## Prepare machine facts
 
 ```bash
-bash scripts/install/prepare.sh
-```
-
-The interactive discovery queries the machine, asks you to choose a **whole disk to erase**, and confirms boot mode, network settings and SSH key. It refuses to replace an existing `.deployment/`. It does **not** format the disk. For a different target, back up your existing `.deployment/` separately before preparing again.
-
-Review the result **before continuing**:
-
-```bash
-cat .deployment/target.txt .deployment/selected-disk.txt
-cat .deployment/generated/machine.nix
-```
-
-Confirm the host, disk, boot and network values match the intended machine. If any value is wrong, stop; do not proceed to installation.
-
-## 3. Set a console recovery password
-
-```bash
+bash scripts/deployment/prepare.sh root@HOST /dev/WHOLE_DISK HOSTNAME ~/.ssh/id_ed25519.pub dhcp
+# Or use: static IPv4/CIDR GATEWAY COMMA_SEPARATED_DNS
 bash scripts/install/recovery-password.sh
+bash scripts/deployment/toolkit.sh preflight .deployment/record.json
 ```
 
-Enter a temporary password for the `recovery` account at the prompt. The command saves only a password hash under `.deployment/extra-files/`, not plaintext. Protect that directory. The recovery account is for the provider's **out-of-band console**, not SSH password login.
+`prepare.sh` calls the pinned toolkit to discover architecture, boot, NIC/MAC and the *selected whole disk*; it generates agentic's private `.deployment/generated/machine.nix`. It refuses an existing `.deployment/`. Review both that file and the mode-0600 `record.json` against the provider console. Preflight re-probes; it does not erase. Keep `.deployment/` private and back it up off-host.
 
-## 4. Run preflight checks
+## Install exactly the pushed branch tip
+
+Only after backups, console access and target facts are verified:
 
 ```bash
-bash scripts/install/preflight.sh
+rev=$(git rev-parse HEAD)
+branch=$(git branch --show-current)
+bash scripts/deployment/toolkit.sh install \
+  .deployment/record.json "$PWD" "$rev" .deployment/generated agentic "$branch" \
+  .deployment/install-receipt.json \
+  "$PWD/scripts/deployment/facter.sh" .deployment/extra-files \
+  "$PWD/scripts/deployment/pre-erase.sh"
 ```
 
-Preflight rechecks the remote whole disk, boot mode, network interface and MAC address. It pins flake inputs, evaluates the NixOS derivation and verifies the effective bootloader and network configuration. Review its output, especially the disk and network choices. For static networking, IPv6 or provider-specific routing, independently confirm the configuration. Preflight does not format the disk.
+The shared toolkit requires a clean checkout and the exact pushed branch head; builds the NixOS system; runs agentic's evaluated disk/boot/network/SSH check; re-probes; then requires `ERASE /dev/WHOLE_DISK`. **Only this command runs `nixos-anywhere`/Disko.** The optional facter hook runs a Nixpkgs-revision-pinned facter on the rescue host and saves `facter.json`; if rescue Nix is unavailable, stop and arrange a reviewed report before install rather than bypassing the check. The recovery hash is sent separately via `--extra-files`, not through the Nix store.
 
-## 5. Deploy — destructive
+If installation succeeds but receipt creation fails, **do not reinstall to repair it**. Verify the actual installed revision through the console. Save the receipt off-host.
 
-**Stop unless off-server backups, out-of-band recovery access and the selected disk are verified. The next command invokes Disko and erases that disk.**
+## Bootstrap after first boot
+
+Verify the *new* SSH host fingerprint through the provider console before reconnecting:
 
 ```bash
-bash scripts/install/deploy.sh --install
+bash scripts/deployment/toolkit.sh bootstrap \
+  .deployment/install-receipt.json "$PWD" .deployment/generated \
+  /var/lib/agentic/source /var/lib/agentic/machine /var/lib/agentic/deployment
 ```
 
-The installer reruns preflight and requires you to type `ERASE-AND-INSTALL-NIXOS` at the final prompt. It then calls `nixos-anywhere`. Do not use this command for updates or repairs.
+The toolkit refuses mismatched private facts and initializes the exact installed revision with a **commit pin**. The timer is present but does nothing until a reviewed transition selects a branch. If bootstrap is interrupted, retry with the same receipt, not the installer. Transfer GitHub App credentials separately if configured:
 
-## 6. Verify the first boot
+```bash
+bash scripts/deployment/credentials.sh root@HOST
+```
 
-1. If the machine was reinstalled, verify its **new SSH host-key fingerprint through the provider console** before updating `known_hosts`. Confirm you can connect as `agentic` with your key.
-2. On the machine, run `journalctl -u agentic-firstboot-check -b --no-pager`; check networking and SSH. For harness-specific use and verification, see [sandbox and skills](sandbox.md).
-3. Test the `recovery` account password at the provider's out-of-band console. Keep that path available until networking is stable.
-4. Keep `.deployment/generated/machine.nix`, `.deployment/generated/facter.json`, `.deployment/flake.lock` and the rest of `.deployment/` privately on the deployment computer for [future updates](update.md). Back them up off-server.
-
-If a post-install service needs repair, use the [non-destructive update](update.md), not the disk installer. See [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md) for feature-specific steps.
+Verify SSH, network, recovery-console login, `agentic-firstboot-check`, the poll timer and agentic services. See [updates and recovery](update.md). No server changes merely by merging this PR.
