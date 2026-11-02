@@ -1,3 +1,5 @@
 /.deployment/
 /.deployment.stage.*/
+/.deployment.fixture.*/
+/generated/
 /secrets/

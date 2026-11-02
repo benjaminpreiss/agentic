@@ -1,0 +1,22 @@
+# Copy to .github/workflows/ on the PR branch after review. GitHub only runs
+# workflows from .github/workflows/, so this template does not change CI yet.
+name: Deployment fixture checks
+on:
+  pull_request:
+    paths:
+      - 'flake.*'
+      - 'nixos/**'
+      - 'deployment/**'
+      - 'skills/**'
+      - 'scripts/**'
+      - 'workflow-templates/deployment-checks.yml'
+  workflow_dispatch:
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31
+      - run: bash scripts/test-deployment.sh

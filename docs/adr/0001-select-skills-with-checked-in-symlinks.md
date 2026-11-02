@@ -1,3 +1,6 @@
+---
+status: superseded by ADR-0002
+---
 # Select NixOS skills with checked-in symlinks
 
 We will keep skills in this monorepo and make the contents of `skills/enabled/` the selection interface for skills installed by NixOS. `skills/available/` holds skills maintained here and skills imported from other authors (including Matt Pocock). A checked-in symlink from `enabled/` to a skill in `available/` enables it; removing the link disables it without deleting the source. Matt Pocock's skills are enabled by default through checked-in links, not through a special Nix option. This avoids maintaining a separate enable list or toggle alongside the directory.

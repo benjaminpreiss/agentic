@@ -21,19 +21,16 @@ for dir in "$ROOT/nixos" "$ROOT/github-protection" "$ROOT/scripts/runtime" "$ROO
     echo "Unexpected symlink in $dir" >&2; exit 1
   fi
 done
-[[ -d "$ROOT/skills/enabled" && ! -L "$ROOT/skills/enabled" ]] || { echo 'Missing skills/enabled' >&2; exit 1; }
-for link in "$ROOT"/skills/enabled/*; do
-  [[ -e "$link" || -L "$link" ]] || continue
-  [[ -L "$link" ]] || { echo "Enabled skill must be a symlink: $link" >&2; exit 1; }
-  name="${link##*/}"; target="$(readlink "$link")"
-  case "$name" in *[!a-zA-Z0-9_-]*|'') echo "Invalid skill name: $name" >&2; exit 1 ;; esac
-  # No absolute paths, traversal, or chains. Only reviewed skill directories.
-  case "$target" in ../available/*) ;; *) echo "Escaping enabled skill: $link -> $target" >&2; exit 1 ;; esac
-  case "$target/" in *'/../'*|*'/./'*|*'//'*) echo "Invalid skill target: $link -> $target" >&2; exit 1 ;; esac
-  [[ -d "$link" && -f "$link/SKILL.md" && ! -L "$link/SKILL.md" ]] || {
-    echo "Broken skill or missing SKILL.md: $link -> $target" >&2; exit 1;
+command -v nix >/dev/null && command -v jq >/dev/null || { echo 'Nix and jq required for skill selection' >&2; exit 1; }
+SELECTION="$(nix --extra-experimental-features 'nix-command flakes' eval --json --file "$ROOT/skills/enabled.nix")"
+# The legacy deployment flake still needs enabled/ links until an existing host
+# has been explicitly migrated. Reconstruct only validated, in-tree links.
+while IFS=$'\t' read -r name relative; do
+  [[ $name =~ ^[a-zA-Z0-9_-]+$ && $relative =~ ^[a-zA-Z0-9_/-]+$ && $relative != /* && $relative != *..* ]] || {
+    echo "Invalid selected skill: $name $relative" >&2; exit 1;
   }
-done
+  [[ -f "$ROOT/skills/available/$relative/SKILL.md" ]] || { echo "Missing selected skill: $relative" >&2; exit 1; }
+done < <(jq -r 'to_entries[] | [.key,.value] | @tsv' <<<"$SELECTION")
 # Build all managed sources before touching the existing deployment. Preserve
 # generated/, extra-files/, flake.lock and the machine's target/selection files.
 umask 077
@@ -49,12 +46,11 @@ for f in check.sh github-api.sh ci.sh policy.jq rulesets.jq; do
   cp "$ROOT/github-protection/$f" "$TMP/github-protection/$f"
 done
 cp -R "$ROOT/skills/available" "$TMP/skills/available"
-cp -R "$ROOT/skills/enabled" "$TMP/skills/enabled"
-# Validate the copied links as well (cp -R must preserve symlinks).
-for link in "$TMP"/skills/enabled/*; do
-  [[ -e "$link" || -L "$link" ]] || continue
-  [[ -L "$link" && -f "$link/SKILL.md" ]] || { echo "Staged skill link invalid: $link" >&2; exit 1; }
-done
+mkdir "$TMP/skills/enabled"
+while IFS=$'\t' read -r name relative; do
+  ln -s "../available/$relative" "$TMP/skills/enabled/$name"
+  [[ -f "$TMP/skills/enabled/$name/SKILL.md" ]] || { echo "Staged skill invalid: $name" >&2; exit 1; }
+done < <(jq -r 'to_entries[] | [.key,.value] | @tsv' <<<"$SELECTION")
 # Remove old managed trees, including stale modules/scripts/skills, while
 # leaving all machine-specific records untouched. A failed copy never reaches
 # this point.
