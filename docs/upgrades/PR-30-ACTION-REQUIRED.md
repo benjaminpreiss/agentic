@@ -9,4 +9,4 @@ Before any existing-host migration:
 3. Verify the active NixOS generation and original machine facts. `f73e8ca` is an operator-reported candidate, *not* a recorded host revision. If uncertain, use a reviewed non-destructive switch to establish a known baseline; never edit state by guess or rerun Disko.
 4. Only after successful adoption and validation select a tracked branch. Fresh toolkit installs begin pinned to a commit; timer invocations before adoption fail closed.
 
-For a new host, follow [install](../install.md). Run `bash scripts/test-deployment.sh` and test a disposable VM first. The workflow template in `workflow-templates/deployment-checks.yml` must be reviewed and moved to `.github/workflows/` on the PR branch for GitHub to execute it.
+For a new host, follow [install](../install.md). Run `bash scripts/test-deployment.sh` and test a disposable VM first. The reviewed deployment fixture workflow now lives at `.github/workflows/deployment-checks.yml`; confirm its PR check passes before merging.
