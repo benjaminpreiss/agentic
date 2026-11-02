@@ -8,7 +8,8 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/repo"/{nixos/modules,nixos/profiles,github-protection,scripts/runtime,scripts/github,skills/available/demo,.deployment/generated,.deployment/extra-files,secrets}
 cp "$ROOT/scripts/stage.sh" "$tmp/repo/scripts/stage.sh"
 printf '{}\n' > "$tmp/repo/nixos/flake.nix"
-printf '{ demo = "demo"; }\n' > "$tmp/repo/skills/enabled.nix"
+cp "$ROOT/skills/select.nix" "$tmp/repo/skills/select.nix"
+printf '[ "demo" ]\n' > "$tmp/repo/skills/enabled.nix"
 printf 'skill\n' > "$tmp/repo/skills/available/demo/SKILL.md"
 printf 'module\n' > "$tmp/repo/nixos/modules/demo.nix"
 printf 'old lock\n' > "$tmp/repo/.deployment/flake.lock"
@@ -24,9 +25,16 @@ bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment"
 [[ $(<"$tmp/repo/.deployment/generated/machine.nix") == 'private machine' ]]
 [[ -f "$tmp/repo/.deployment/generated/facter.json" && -f "$tmp/repo/.deployment/extra-files/hash" ]]
 [[ ! -e "$tmp/repo/.deployment/secrets" ]]
-printf '{ demo = "../../secrets"; }\n' > "$tmp/repo/skills/enabled.nix"
+printf '[ "../../secrets" ]\n' > "$tmp/repo/skills/enabled.nix"
 if bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment" 2>/dev/null; then echo 'Accepted escaping skill!' >&2; exit 1; fi
 [[ -f "$tmp/repo/.deployment/skills/enabled/demo/SKILL.md" ]]
-printf '{ demo = "missing"; }\n' > "$tmp/repo/skills/enabled.nix"
+printf '[ "missing" ]\n' > "$tmp/repo/skills/enabled.nix"
 if bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment" 2>/dev/null; then echo 'Accepted missing skill!' >&2; exit 1; fi
-echo 'Legacy staging preserves private state and validates selected skills.'
+# Wildcards include nested reviewed skills; selection changes do not touch private files.
+mkdir -p "$tmp/repo/skills/available/family/topic/second"
+printf 'skill\n' > "$tmp/repo/skills/available/family/topic/second/SKILL.md"
+printf '[ "family/*" ]\n' > "$tmp/repo/skills/enabled.nix"
+bash "$tmp/repo/scripts/stage.sh" "$tmp/repo/.deployment"
+[[ -f "$tmp/repo/.deployment/skills/enabled/second/SKILL.md" && ! -e "$tmp/repo/.deployment/skills/enabled/demo" ]]
+[[ $(<"$tmp/repo/.deployment/flake.lock") == 'old lock' ]]
+echo 'Legacy staging preserves private state and validates exact and wildcard skill selections.'

@@ -1,12 +1,14 @@
-# Install a new agentic NixOS host
+# Install agentic on a new machine
 
-> **`install` destroys the selected whole disk.** Do not run these steps on an existing host. [Update and migration](update.md) never run Disko. Test on a disposable VM first; CI does not perform a real install.
+> ⚠️ **Fresh install erases a whole disk.** For an existing agentic host, use the [update guide](update.md). Merging this PR does not change a server.
 
-## Before starting
+The operator chooses the machine and disk. The pinned themoss.net toolkit discovers its hardware, builds agentic, checks the target again and demands a **typed disk confirmation**. It is the only path that runs Disko.
 
-- Review and push the exact agentic commit to install. Its root `flake.lock` pins Nixpkgs and the themoss.net toolkit. Verify the rescue host's SSH fingerprint through the provider console before connecting.
-- Back up all target data **off-server** and confirm console recovery. The operator machine needs Nix with flakes, SSH, jq, a public SSH key and a Linux Nix builder. The rescue host needs root SSH; the optional facter generator also requires Nix with flakes on the rescue host.
-- From this checkout, enter the toolkit's pinned operator shell (GNU tools on macOS):
+## 1. Prepare on your deployment computer
+
+- Back up the target **off-server**; verify its recovery console and the rescue SSH host fingerprint *through the provider console*.
+- Review and push the exact agentic commit you intend to install. Its root `flake.lock` pins the toolkit and Nix dependencies.
+- Use Nix with flakes, SSH and jq. On macOS, enter the toolkit's pinned GNU-tool shell and configure a **Linux Nix builder** (or use a Linux VM):
 
   ```bash
   toolkit=$(nix eval --raw --no-write-lock-file "path:$PWD#toolkitPath")
@@ -14,40 +16,48 @@
   bash scripts/test-deployment.sh
   ```
 
-  Mac operation has not been validated on a live server. Use a Linux VM with Nix if you cannot configure a Linux builder. Never put passwords, hashes, keys or App credentials in the flake source.
+  The shell is tested on Linux; native macOS use has **not** been validated on a live server. Keep keys, password hashes and credentials outside Git and the Nix store.
 
-## Prepare machine facts
+## 2. Discover and review the target
 
 ```bash
-bash scripts/deployment/prepare.sh root@HOST /dev/WHOLE_DISK HOSTNAME ~/.ssh/id_ed25519.pub dhcp
-# Or use: static IPv4/CIDR GATEWAY COMMA_SEPARATED_DNS
+bash scripts/deployment/prepare.sh
 bash scripts/install/recovery-password.sh
 bash scripts/deployment/toolkit.sh preflight .deployment/record.json
 ```
 
-`prepare.sh` calls the pinned toolkit to discover architecture, boot, NIC/MAC and the *selected whole disk*; it generates agentic's private `.deployment/generated/machine.nix`. It refuses an existing `.deployment/`. Review both that file and the mode-0600 `record.json` against the provider console. Preflight re-probes; it does not erase. Keep `.deployment/` private and back it up off-host.
+`prepare.sh` shows the rescue host's whole disks and asks **you** to type the `/dev/…` disk to erase. *It never chooses one.* It detects architecture, boot mode, default-route NIC and MAC. DHCP is suggested only when the rescue host reports lease evidence; otherwise choose DHCP or supply static IPv4/CIDR, gateway and DNS explicitly. The script generates private `.deployment/record.json` and `generated/machine.nix` and refuses to overwrite an existing `.deployment/`.
 
-## Install exactly the pushed branch tip
+Review the disk, boot and network settings **against the provider console**. The recovery-password command saves a hash for the console account in `.deployment/extra-files/`, never in the flake. Toolkit preflight re-probes the target without formatting anything.
 
-Only after backups, console access and target facts are verified:
+<details>
+<summary>Non-interactive preparation</summary>
+
+If you already know the target settings, pass them explicitly:
 
 ```bash
-rev=$(git rev-parse HEAD)
-branch=$(git branch --show-current)
-bash scripts/deployment/toolkit.sh install \
-  .deployment/record.json "$PWD" "$rev" .deployment/generated agentic "$branch" \
-  .deployment/install-receipt.json \
-  "$PWD/scripts/deployment/facter.sh" .deployment/extra-files \
-  "$PWD/scripts/deployment/pre-erase.sh"
+bash scripts/deployment/prepare.sh root@HOST /dev/WHOLE_DISK HOSTNAME ~/.ssh/id_ed25519.pub dhcp
+# Static: replace dhcp with static IPv4/CIDR GATEWAY COMMA_SEPARATED_DNS
 ```
 
-The shared toolkit requires a clean checkout and the exact pushed branch head; builds the NixOS system; runs agentic's evaluated disk/boot/network/SSH check; re-probes; then requires `ERASE /dev/WHOLE_DISK`. **Only this command runs `nixos-anywhere`/Disko.** The optional facter hook runs a Nixpkgs-revision-pinned facter on the rescue host and saves `facter.json`; if rescue Nix is unavailable, stop and arrange a reviewed report before install rather than bypassing the check. The recovery hash is sent separately via `--extra-files`, not through the Nix store.
+Both paths call the same shared discovery and later require typed erase confirmation.
+</details>
 
-If installation succeeds but receipt creation fails, **do not reinstall to repair it**. Verify the actual installed revision through the console. Save the receipt off-host.
+## 3. Install the reviewed commit
 
-## Bootstrap after first boot
+**Stop unless the off-host backup and console recovery work.** From a clean checkout at the pushed branch tip:
 
-Verify the *new* SSH host fingerprint through the provider console before reconnecting:
+```bash
+bash scripts/deployment/install.sh
+```
+
+The short adapter supplies agentic's paths and checks to the pinned toolkit. The toolkit verifies the pushed commit, generates a private hardware report using `nixos-facter` *if one does not already exist*, builds the NixOS derivation, evaluates agentic's effective disk/boot/network/SSH choices, re-probes, then prompts for `ERASE /dev/WHOLE_DISK`. The rescue host needs Nix with flakes for facter; if it lacks Nix, **stop** and prepare a reviewed report first. The recovery hash travels separately via `--extra-files`. Neither it nor GitHub App keys enter the flake.
+
+**If install succeeds but receipt creation fails, do not rerun the installer.** Inspect the installed revision via console and keep the original private records.
+
+## 4. Verify the new SSH key, then bootstrap
+
+The installed system has a *different* SSH host key. Verify it via the provider console before updating `known_hosts`:
 
 ```bash
 bash scripts/deployment/toolkit.sh bootstrap \
@@ -55,10 +65,6 @@ bash scripts/deployment/toolkit.sh bootstrap \
   /var/lib/agentic/source /var/lib/agentic/machine /var/lib/agentic/deployment
 ```
 
-The toolkit refuses mismatched private facts and initializes the exact installed revision with a **commit pin**. The timer is present but does nothing until a reviewed transition selects a branch. If bootstrap is interrupted, retry with the same receipt, not the installer. Transfer GitHub App credentials separately if configured:
+Bootstrap checks the receipt against the original machine files, creates a root-owned checkout at the installed commit and pins the host to **`commit:INSTALLED_SHA`**. The poll timer is present but does nothing until an operator explicitly selects a branch. Interrupted bootstrap may be retried with the *same* receipt; never reinstall to repair it.
 
-```bash
-bash scripts/deployment/credentials.sh root@HOST
-```
-
-Verify SSH, network, recovery-console login, `agentic-firstboot-check`, the poll timer and agentic services. See [updates and recovery](update.md). No server changes merely by merging this PR.
+If configured, transfer GitHub App credentials **separately** with `bash scripts/deployment/credentials.sh root@HOST`. Verify SSH, networking, recovery-console login, `agentic-firstboot-check`, and agentic's services. Back up `.deployment/` off-host. See [tracking and recovery](update.md).

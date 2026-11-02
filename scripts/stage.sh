@@ -22,7 +22,7 @@ for dir in "$ROOT/nixos" "$ROOT/github-protection" "$ROOT/scripts/runtime" "$ROO
   fi
 done
 command -v nix >/dev/null && command -v jq >/dev/null || { echo 'Nix and jq required for skill selection' >&2; exit 1; }
-SELECTION="$(nix --extra-experimental-features 'nix-command flakes' eval --json --file "$ROOT/skills/enabled.nix")"
+SELECTION="$(nix --extra-experimental-features 'nix-command flakes' eval --json --file "$ROOT/skills/select.nix")"
 # The legacy deployment flake still needs enabled/ links until an existing host
 # has been explicitly migrated. Reconstruct only validated, in-tree links.
 while IFS=$'\t' read -r name relative; do

@@ -2,6 +2,45 @@
 # Agentic-specific machine choices; shared toolkit owns target discovery.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+if [[ $# == 0 ]]; then
+  # Detect candidates, never choose the disk to erase for the operator.
+  [[ -r /dev/tty ]] || { echo 'Interactive terminal required; see --help for arguments' >&2; exit 2; }
+  ask() {
+    local prompt=$1 default=${2:-} answer
+    printf '%s%s: ' "$prompt" "${default:+ [$default]}" >/dev/tty
+    IFS= read -r answer </dev/tty
+    REPLY=${answer:-$default}
+  }
+  ask 'Root SSH target (SSH fingerprint must already be verified)'
+  target=$REPLY
+  [[ $target =~ ^root@[a-zA-Z0-9_.:-]+$ ]] || { echo 'Invalid target' >&2; exit 1; }
+  echo 'Whole disks reported by rescue environment (confirm in provider console):'
+  ssh -o StrictHostKeyChecking=yes "$target" 'lsblk -d -o PATH,SIZE,TYPE,MODEL,SERIAL'
+  ask 'Whole /dev disk to erase (no automatic selection)'
+  disk=$REPLY
+  host_default=$(ssh -o StrictHostKeyChecking=yes "$target" 'hostname -s')
+  ask 'New NixOS hostname' "${host_default:-agentic-node}"
+  hostname=$REPLY
+  ask 'Local SSH public key file' "$HOME/.ssh/id_ed25519.pub"
+  keyfile=$REPLY
+  # Only positive DHCP lease evidence provides a default; static remains an
+  # explicit choice because public/private IP ranges do not imply DHCP.
+  iface=$(ssh -o StrictHostKeyChecking=yes "$target" "ip -4 route show default | awk 'NR==1 {for(i=1;i<=NF;i++) if(\$i==\"dev\") {print \$(i+1);exit}}'")
+  mode_default=''
+  if [[ $iface =~ ^[a-zA-Z0-9_.:-]+$ ]] &&
+    ssh -o StrictHostKeyChecking=yes "$target" "networkctl status '$iface' --no-pager 2>/dev/null" | grep -Eq 'DHCP4 Client ID|DHCP4 Address|DHCP4 via|Address:.*\(DHCP4\)'; then
+    mode_default=dhcp
+  fi
+  ask 'Network mode (dhcp/static; inspect provider routing)' "$mode_default"
+  mode=$REPLY
+  if [[ $mode == static ]]; then
+    ask 'Static IPv4/CIDR'; addr=$REPLY
+    ask 'IPv4 gateway'; gateway=$REPLY
+    ask 'Comma-separated IPv4 DNS servers'; dns=$REPLY
+    exec bash "$ROOT/scripts/deployment/prepare.sh" "$target" "$disk" "$hostname" "$keyfile" "$mode" "$addr" "$gateway" "$dns"
+  fi
+  exec bash "$ROOT/scripts/deployment/prepare.sh" "$target" "$disk" "$hostname" "$keyfile" "$mode"
+fi
 [[ $# -ge 5 ]] || { echo 'usage: prepare.sh root@HOST /dev/WHOLE_DISK HOSTNAME SSH_PUBLIC_KEY_FILE dhcp|static [IPv4/CIDR GATEWAY DNS,IPS]' >&2; exit 2; }
 target=$1 disk=$2 hostname=$3 keyfile=$4 mode=$5
 [[ $target =~ ^root@[a-zA-Z0-9_.:-]+$ && $disk =~ ^/dev/[a-zA-Z0-9_./+-]+$ && $disk != *../* ]] || { echo 'Invalid target/disk' >&2; exit 1; }

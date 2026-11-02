@@ -19,7 +19,7 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 ### 🧩 Skills
 
-- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). The checked-in, symlink-free [`skills/enabled.nix`](skills/enabled.nix) selects what NixOS installs; see the [decision record](docs/adr/0002-select-skills-with-a-manifest.md).
+- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). The checked-in, symlink-free [`skills/enabled.nix`](skills/enabled.nix) selects what NixOS installs, including recursive family selections; see [choosing skills](docs/skills.md).
 
 ### 🖥️ Machine deployment
 
