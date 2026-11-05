@@ -19,18 +19,20 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 ### 🧩 Skills
 
-- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). The checked-in, symlink-free [`skills/enabled.nix`](skills/enabled.nix) selects what NixOS installs, including recursive family selections; see [choosing skills](docs/skills.md).
+- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). See [choosing skills](docs/skills.md).
 
 ### 🖥️ Machine deployment
 
+Agentic uses the [themoss.net `moss` CLI](https://github.com/benjaminpreiss/themoss.net) for deployment plans, installs, bootstrap and updates; agentic defines the NixOS host.
+
 - [Fresh NixOS installation](docs/install.md) via the pinned `moss machine plan → apply → bootstrap` CLI (**`apply` erases the selected disk only after typed confirmation**).
-- [Non-destructive updates](docs/update.md): toolkit-managed hosts poll their operator-selected branch or stay pinned to a commit (**no Disko**). Existing hosts retain the manual SSH update until individually migrated.
+- [Non-destructive updates](docs/update.md): moss-managed hosts poll their operator-selected branch or stay pinned to a commit (**no Disko**). Existing hosts retain the manual SSH update until individually migrated.
 
 ## Repository map
 
-- `flake.nix`, `flake.lock`, `deployment/`: reviewed toolkit-managed flake, dependency pins and agentic-specific modules.
+- `flake.nix`, `flake.lock`, `deployment/`: reviewed moss-managed flake, dependency pins and agentic-specific modules.
 - `nixos/`, `scripts/update/`, `scripts/stage.sh`: temporary legacy manual update path for existing hosts; do not remove before migration. `scripts/install/recovery-password.sh` only prepares a new host's private recovery hash.
-- `scripts/deployment/`: thin pinned `moss` CLI invoker, agentic-specific machine preparation and evaluated install hooks.
+- `scripts/deployment/`: agentic-specific machine preparation, report generator and evaluated pre-erase hook; the public `moss` CLI handles planning, application and bootstrap.
 - `scripts/runtime/`, `scripts/github/`, `github-protection/`: host-side GitHub credentials, setup and protection audits.
 - `skills/available/`, `skills/enabled.nix`: versioned skills and their reviewed selection.
 - `docs/`: task guides, security guidance, upgrade notes and decisions.

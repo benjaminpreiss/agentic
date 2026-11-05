@@ -1,4 +1,7 @@
-# Evaluate the symlink-free selection manifest for both legacy and new hosts.
+# Evaluate enabled.nix into { installedName = "available/relative/path"; }.
+# New NixOS hosts install these paths directly; legacy staging reconstructs
+# links only inside private .deployment/. "family/*" walks reviewed source
+# recursively. Reject missing skills and duplicate installed names at eval.
 let
   source = ./available;
   entries = import ./enabled.nix;

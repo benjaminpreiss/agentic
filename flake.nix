@@ -11,7 +11,7 @@
     themoss.url = "github:benjaminpreiss/themoss.net/18ab6e8da7d8ff828cf9e9188221d3d2fcde830c";
   };
   outputs = inputs@{ nixpkgs, disko, ... }: {
-    toolkitPath = inputs.themoss.outPath;
+    mossSource = inputs.themoss.outPath;
     nixosConfigurations.agentic = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };

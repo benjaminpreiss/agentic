@@ -2,7 +2,7 @@
 # Credential-free regression test. Never contacts GitHub or invokes the helper.
 set -euo pipefail
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-script="$script_dir/configure-git-credentials.sh"
+script="$script_dir/../scripts/github/configure-git-credentials.sh"
 # Keep the test home inside the checkout so sandboxed runs can read and write it.
 tmp="$(mktemp -d "$script_dir/../.test-git-config.XXXXXXXX")"
 trap 'rm -rf "$tmp"' EXIT

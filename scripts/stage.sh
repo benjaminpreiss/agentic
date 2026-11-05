@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Build the .deployment/ Nix flake source for BOTH prepare.sh and apply.sh.
+# Legacy-only staging for existing hosts using scripts/update/apply.sh.
+# The new moss CLI stages the committed root flake itself; never use this
+# staging script for a fresh install or for a moss-managed host.
 # The source layout here matches paths referenced by nixos/modules/*.nix:
 # modules/, scripts/, profiles/, github-protection/, skills/ and flake.nix.
 # Only these reviewed, credential-free inputs are copied; generated machine

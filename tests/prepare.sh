@@ -6,9 +6,10 @@ tmp=$(mktemp -d "$ROOT/.deployment.fixture.prepare.XXXXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/repo/scripts/deployment" "$tmp/bin"
 cp "$ROOT/scripts/deployment/prepare.sh" "$tmp/repo/scripts/deployment/prepare.sh"
-printf '#!/usr/bin/env bash\nset -eu\ncd "$(dirname "$0")/../.."\nexec "$MOSS_BIN" "$@"\n' > "$tmp/repo/scripts/deployment/toolkit.sh"
-MOSS_BIN=$(nix --extra-experimental-features 'nix-command flakes' eval --raw --no-write-lock-file "path:$ROOT#toolkitPath")/packages/cli/bin/moss
-export MOSS_BIN
+TEST_MOSS_SOURCE=$(nix --extra-experimental-features 'nix-command flakes' eval --raw --no-write-lock-file "path:$ROOT#mossSource")
+export TEST_MOSS_SOURCE
+printf '#!/usr/bin/env bash\nset -eu\n[[ $* == *mossSource* ]]\nprintf "%%s\\n" "$TEST_MOSS_SOURCE"\n' > "$tmp/bin/nix"
+chmod +x "$tmp/bin/nix"
 cat > "$tmp/bin/ssh" <<'MOCK'
 #!/usr/bin/env bash
 case "$*" in

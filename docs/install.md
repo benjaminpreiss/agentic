@@ -11,9 +11,13 @@ The **pinned `moss` CLI** now owns the operator lifecycle: `init → machine pla
 - On the operator computer, use Nix with flakes, SSH, jq and the toolkit's pinned shell (GNU tools on macOS):
 
   ```bash
-  toolkit=$(nix eval --raw --no-write-lock-file "path:$PWD#toolkitPath")
-  nix develop --no-write-lock-file "path:$toolkit#operator"
-  bash scripts/test-deployment.sh
+  moss_source=$(nix eval --raw --no-write-lock-file "path:$PWD#mossSource")
+  nix develop --no-write-lock-file "path:$moss_source#operator"
+  # In the operator shell, expose the pinned public moss CLI:
+  moss_source=$(nix eval --raw --no-write-lock-file "path:$PWD#mossSource")
+  export PATH="$moss_source/packages/cli/bin:$PATH"
+  moss --version
+  bash tests/deployment.sh
   ```
 
   A Mac also needs a **Linux Nix builder** or a Linux VM. This shell is CI-tested on Linux; a real macOS install has not been validated. Credentials never belong in Nix source or the store.
@@ -25,7 +29,7 @@ bash scripts/deployment/prepare.sh
 bash scripts/install/recovery-password.sh
 ```
 
-`prepare.sh` asks for the verified SSH target, shows whole disks and asks you to **name the disk**; it does not choose one. It reads architecture, boot mode, NIC/MAC and suggests DHCP only with positive lease evidence. You supply the hostname, SSH public key and any static IP, gateway and DNS. It creates private, ignored `.deployment/generated/machine.nix` and `.moss/root@HOST/machine.json`, and calls the pinned `moss init` for operator-local storage.
+`prepare.sh` asks for the verified SSH target, shows whole disks and asks you to **name the disk**; it does not choose one. It reads architecture, boot mode, NIC/MAC and suggests DHCP only with positive lease evidence. You supply the hostname, SSH public key and any static IP, gateway and DNS. It calls `moss init`, then writes ignored `.deployment/generated/machine.nix` and `.moss/root@HOST/machine.json`. **Why a consumer helper?** `moss` does not author agentic's NixOS configuration: its plan needs a complete `machine.nix` (including the chosen Disko disk) before it can evaluate/build. The CLI independently verifies the choice before it can be applied. The helper does not plan, install or bootstrap.
 
 Review both files against the provider console. The recovery-password command places a console password *hash* under `.deployment/extra-files/`, not in the flake. Neither command formats a disk.
 
@@ -43,7 +47,7 @@ bash scripts/deployment/prepare.sh root@HOST /dev/WHOLE_DISK HOSTNAME ~/.ssh/id_
 ## 3. Make and review a plan—still no disk action
 
 ```bash
-bash scripts/deployment/toolkit.sh machine plan root@HOST
+moss machine plan root@HOST
 ```
 
 The pinned CLI reads the private `.moss/root@HOST/machine.json`. It probes the target and disk identity again, checks the exact pushed branch tip, generates the optional private `facter.json`, builds NixOS and runs agentic's **effective** disk, boot, network and SSH checks. Review its new mode-0600 plan under `.moss/root@HOST/plans/`, especially the disk, target, branch and hardware. The `latest` symlink points to the last published plan; neither it nor a plan grants erase permission.
@@ -55,7 +59,7 @@ The facter hook needs Nix with flakes on the rescue host. If it is unavailable, 
 **Stop unless off-host backups and console recovery work.** Then:
 
 ```bash
-bash scripts/deployment/toolkit.sh machine apply --target root@HOST
+moss machine apply --target root@HOST
 ```
 
 `apply` repeats the build, consumer checks, target probe and pushed-tip check. If anything changed, **stop and make a new plan**. Only after these checks does it demand `ERASE /dev/WHOLE_DISK` and invoke `nixos-anywhere`/Disko. The recovery hash travels via separate `--extra-files`, never via Nix source.
@@ -67,7 +71,7 @@ If installation succeeds but the receipt is missing, **do not rerun the installe
 Check the installed host's new SSH fingerprint through the provider console before updating `known_hosts`:
 
 ```bash
-bash scripts/deployment/toolkit.sh machine bootstrap "$PWD/.moss/root@HOST/install-receipt.json"
+moss machine bootstrap "$PWD/.moss/root@HOST/install-receipt.json"
 ```
 
 Bootstrap verifies the receipt and original private inputs, creates a root-owned checkout at the installed commit and pins the host to **`commit:INSTALLED_SHA`**. The timer is present but performs no update until an operator explicitly selects a branch. If interrupted, retry bootstrap with the *same* receipt; never reinstall as a repair.

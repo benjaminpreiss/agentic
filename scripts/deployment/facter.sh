@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Optional shared-installer hook: run a pinned facter on a rescue target with Nix.
+# moss plan's optional reportGenerator hook. moss accepts a hardware report,
+# but does not run nixos-facter itself. Agentic selects its own locked Nixpkgs
+# revision here; the report is generated off-host before the plan/build.
 set -euo pipefail
 [[ $# == 2 ]] || { echo 'usage: facter.sh TARGET OUTPUT_JSON' >&2; exit 2; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"

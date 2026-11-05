@@ -66,7 +66,8 @@ mac=$(ssh -o StrictHostKeyChecking=yes "$target" "cat /sys/class/net/$iface/addr
 # Operator-local, ignored storage is owned by moss. Neither config nor plan is
 # written into the Nix store or committed source.
 umask 077
-bash "$ROOT/scripts/deployment/toolkit.sh" init
+moss_source=$(nix --extra-experimental-features 'nix-command flakes' eval --raw --no-write-lock-file "path:$ROOT#mossSource")
+(cd "$ROOT" && "$moss_source/packages/cli/bin/moss" init)
 [[ ! -e $ROOT/.moss/$target/machine.json && ! -L $ROOT/.moss/$target/machine.json ]] || { echo 'Existing moss machine config: do not overwrite' >&2; exit 1; }
 mkdir -m 700 "$ROOT/.deployment"
 mkdir -m 700 "$ROOT/.deployment/generated"
