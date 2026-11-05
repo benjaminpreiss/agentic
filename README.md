@@ -19,19 +19,22 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 ### 🧩 Skills
 
-- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). Checked-in links under `skills/enabled/` select what NixOS installs; see the [decision record](docs/adr/0001-select-skills-with-checked-in-symlinks.md).
+- Reviewed skills under `skills/available/`, including [Matt Pocock's skills](skills/available/mattpocock/IMPORT.md). See [choosing skills](docs/skills.md).
 
 ### 🖥️ Machine deployment
 
-- [Fresh NixOS installation](docs/install.md) with nixos-anywhere and Disko (**erases the selected disk**).
-- [Non-destructive updates](docs/update.md) via NixOS rebuild over SSH (**no Disko**). These workflows are scripted today; the repo structure leaves room for deployment automation.
+Agentic uses the [themoss.net `moss` CLI](https://github.com/benjaminpreiss/themoss.net) for deployment plans, installs, bootstrap and updates; agentic defines the NixOS host.
+
+- [Fresh NixOS installation](docs/install.md) via the pinned `moss machine plan → apply → bootstrap` CLI (**`apply` erases the selected disk only after typed confirmation**).
+- [Non-destructive updates](docs/update.md): moss-managed hosts poll their operator-selected branch or stay pinned to a commit (**no Disko**). Existing hosts retain the manual SSH update until individually migrated.
 
 ## Repository map
 
-- `nixos/`: flake, system modules and local nono profiles.
-- `scripts/install/`, `scripts/update/`: operator workflows. Both use `scripts/stage.sh` to build credential-free deployment source.
+- `flake.nix`, `flake.lock`, `deployment/`: reviewed moss-managed flake, dependency pins and agentic-specific modules.
+- `nixos/`, `scripts/update/`, `scripts/stage.sh`: temporary legacy manual update path for existing hosts; do not remove before migration. `scripts/install/recovery-password.sh` only prepares a new host's private recovery hash.
+- `scripts/deployment/`: agentic-specific machine preparation, report generator and evaluated pre-erase hook; the public `moss` CLI handles planning, application and bootstrap.
 - `scripts/runtime/`, `scripts/github/`, `github-protection/`: host-side GitHub credentials, setup and protection audits.
-- `skills/available/`, `skills/enabled/`: versioned skills and the sole installation selection.
+- `skills/available/`, `skills/enabled.nix`: versioned skills and their reviewed selection.
 - `docs/`: task guides, security guidance, upgrade notes and decisions.
 
-`.deployment/` holds generated machine configuration and the Nix lock file. Keep it privately for updates; it is Git-ignored. `secrets/` holds local GitHub App credentials and is also Git-ignored. **Never commit either, put secrets in Nix expressions, or copy the key into the Nix store.** Unattended NixOS upgrades are disabled.
+`.moss/` holds ignored operator-local machine configurations, plans and receipts; `.deployment/` holds private machine facts and (for existing hosts only) their original lockfile. Back both up off-host and never commit them. New hosts use the committed root lockfile. `secrets/` holds local GitHub App credentials and is Git-ignored. **Never put private keys, hashes or tokens in Nix source or the store.** Only hosts explicitly bootstrapped and switched to branch tracking perform autonomous OS updates.

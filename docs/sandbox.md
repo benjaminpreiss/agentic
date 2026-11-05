@@ -23,10 +23,6 @@ The GitHub App private key stays **outside** both sandboxes. Pi and OMP have sep
 
 Pi's `suppress_save_prompt: ["/"]` prevents denied paths from being offered for an interactive profile-save grant on exit. It does **not** grant access or hide denial diagnostics. A denial (including `/tmp`) must be investigated and any needed access changed deliberately outside the session; do not grant all of `/tmp` to avoid a warning. This setting applies to both interactive `pi` and `pi -p ...`. OMP has a separate profile and still grants all of `~/work`.
 
-## Select installed skills
-
-Reviewed, versioned skills live in [`skills/available/`](../skills/available/); links in [`skills/enabled/`](../skills/enabled/) select which ones NixOS installs. Remove a link to disable a skill without deleting its source. Stage again with `bash scripts/test-stage.sh` to check links before applying an [update](update.md). Broken or escaping links fail staging; user-managed skills outside the dedicated `~/.pi/agent/skills/agentic` directory are not overwritten. Imported Matt Pocock skills are enabled by default; see [their provenance](../skills/available/mattpocock/IMPORT.md) and [the selection decision](adr/0001-select-skills-with-checked-in-symlinks.md).
-
 ## What the wrappers do—and do not protect
 
 The raw agent packages are referenced by Nix store paths inside the wrappers, not installed on the system `PATH`. Interactive Zsh prioritizes the wrappers over `~/.local/bin`, so ordinary command lookup uses nono.

@@ -1,5 +1,7 @@
 # Action required after PR #28: remove the old skills link
 
+> Historical PR #28 guidance. On current checkouts, use [PR #30's migration note](PR-30-ACTION-REQUIRED.md) and [the update guide](../update.md); the old installer has been removed.
+
 Use this guide **once** when updating an Agentic NixOS machine from a version before PR #28. These changes are not a general cleanup policy. The [normal update guide](../update.md) contains the full switch procedure; this page calls out what is different for this PR.
 
 ## What changed in this PR

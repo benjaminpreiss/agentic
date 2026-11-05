@@ -1,72 +1,79 @@
-# Install Agentic NixOS on a new machine
+# Install agentic on a new machine
 
-Use this guide to replace the operating system on a remote machine. **Installation repartitions and formats the selected entire disk. Existing partitions and on-disk backups will be lost.** For a machine already running Agentic NixOS, use the [update guide](update.md) instead.
+> ⚠️ **A fresh installation erases a whole disk.** Existing hosts use the [update guide](update.md). Merging this PR changes no server.
 
-## 1. Check prerequisites
+The **pinned `moss` CLI** now owns the operator lifecycle: `init → machine plan → machine apply → machine bootstrap`. Agentic supplies only its host/network choices, private recovery files and evaluated pre-erase checks. A *plan* proposes a disk; **only `apply` can erase it**, after another probe and typed `ERASE /dev/…` consent.
 
-**Deployment computer (Mac or Linux)**
+## 1. Before connecting
 
-- This repository checkout, Bash and SSH.
-- Nix with flakes enabled. We recommend [Determinate Nix](https://docs.determinate.systems/determinate-nix/) for installation; the scripts use Nix to run `nixos-anywhere` and other tools, so you do not need to install those separately.
-- A local SSH public key for the new machine.
+- Back up the target **off-server**. Check the rescue console and independently verify its SSH host fingerprint through the provider console.
+- Review and push the exact agentic commit to deploy. The committed root `flake.lock` pins Nixpkgs and themoss.net.
+- On the operator computer, use Nix with flakes, SSH, jq and the toolkit's pinned shell (GNU tools on macOS):
 
-**Target machine**
+  ```bash
+  moss_source=$(nix eval --raw --no-write-lock-file "path:$PWD#mossSource")
+  nix develop --no-write-lock-file "path:$moss_source#operator"
+  # In the operator shell, expose the pinned public moss CLI:
+  moss_source=$(nix eval --raw --no-write-lock-file "path:$PWD#mossSource")
+  export PATH="$moss_source/packages/cli/bin:$PATH"
+  moss --version
+  bash tests/deployment.sh
+  ```
 
-- An x86_64 machine accessible over SSH as root or with passwordless sudo, with a provider's out-of-band console you can use if networking fails.
-- An identified **whole disk** that can be erased. The install workflow queries its disk, boot and network settings; do not assume the defaults are correct.
+  A Mac also needs a **Linux Nix builder** or a Linux VM. This shell is CI-tested on Linux; a real macOS install has not been validated. Credentials never belong in Nix source or the store.
 
-**Before you start:** back up all data **off the target** and verify recovery. Keep the checkout private: `.deployment/` will contain machine settings and a password hash, and `secrets/` may contain private keys. Both are Git-ignored.
-
-## 2. Discover the target and select the disk
-
-From the repository root, run:
-
-```bash
-bash scripts/install/prepare.sh
-```
-
-The interactive discovery queries the machine, asks you to choose a **whole disk to erase**, and confirms boot mode, network settings and SSH key. It refuses to replace an existing `.deployment/`. It does **not** format the disk. For a different target, back up your existing `.deployment/` separately before preparing again.
-
-Review the result **before continuing**:
+## 2. Prepare agentic's machine configuration
 
 ```bash
-cat .deployment/target.txt .deployment/selected-disk.txt
-cat .deployment/generated/machine.nix
-```
-
-Confirm the host, disk, boot and network values match the intended machine. If any value is wrong, stop; do not proceed to installation.
-
-## 3. Set a console recovery password
-
-```bash
+bash scripts/deployment/prepare.sh
 bash scripts/install/recovery-password.sh
 ```
 
-Enter a temporary password for the `recovery` account at the prompt. The command saves only a password hash under `.deployment/extra-files/`, not plaintext. Protect that directory. The recovery account is for the provider's **out-of-band console**, not SSH password login.
+`prepare.sh` asks for the verified SSH target, shows whole disks and asks you to **name the disk**; it does not choose one. It reads architecture, boot mode, NIC/MAC and suggests DHCP only with positive lease evidence. You supply the hostname, SSH public key and any static IP, gateway and DNS. It calls `moss init`, then writes ignored `.deployment/generated/machine.nix` and `.moss/root@HOST/machine.json`. **Why a consumer helper?** `moss` does not author agentic's NixOS configuration: its plan needs a complete `machine.nix` (including the chosen Disko disk) before it can evaluate/build. The CLI independently verifies the choice before it can be applied. The helper does not plan, install or bootstrap.
 
-## 4. Run preflight checks
+Review both files against the provider console. The recovery-password command places a console password *hash* under `.deployment/extra-files/`, not in the flake. Neither command formats a disk.
 
-```bash
-bash scripts/install/preflight.sh
-```
+<details>
+<summary>Already know the settings?</summary>
 
-Preflight rechecks the remote whole disk, boot mode, network interface and MAC address. It pins flake inputs, evaluates the NixOS derivation and verifies the effective bootloader and network configuration. Review its output, especially the disk and network choices. For static networking, IPv6 or provider-specific routing, independently confirm the configuration. Preflight does not format the disk.
-
-## 5. Deploy — destructive
-
-**Stop unless off-server backups, out-of-band recovery access and the selected disk are verified. The next command invokes Disko and erases that disk.**
+Pass them explicitly instead of using the prompts:
 
 ```bash
-bash scripts/install/deploy.sh --install
+bash scripts/deployment/prepare.sh root@HOST /dev/WHOLE_DISK HOSTNAME ~/.ssh/id_ed25519.pub dhcp
+# For static networking: replace dhcp with static IPv4/CIDR GATEWAY COMMA_SEPARATED_DNS
+```
+</details>
+
+## 3. Make and review a plan—still no disk action
+
+```bash
+moss machine plan root@HOST
 ```
 
-The installer reruns preflight and requires you to type `ERASE-AND-INSTALL-NIXOS` at the final prompt. It then calls `nixos-anywhere`. Do not use this command for updates or repairs.
+The pinned CLI reads the private `.moss/root@HOST/machine.json`. It probes the target and disk identity again, checks the exact pushed branch tip, generates the optional private `facter.json`, builds NixOS and runs agentic's **effective** disk, boot, network and SSH checks. Review its new mode-0600 plan under `.moss/root@HOST/plans/`, especially the disk, target, branch and hardware. The `latest` symlink points to the last published plan; neither it nor a plan grants erase permission.
 
-## 6. Verify the first boot
+The facter hook needs Nix with flakes on the rescue host. If it is unavailable, **stop** and arrange a reviewed report before planning. A failed report/check must not be bypassed to install.
 
-1. If the machine was reinstalled, verify its **new SSH host-key fingerprint through the provider console** before updating `known_hosts`. Confirm you can connect as `agentic` with your key.
-2. On the machine, run `journalctl -u agentic-firstboot-check -b --no-pager`; check networking and SSH. For harness-specific use and verification, see [sandbox and skills](sandbox.md).
-3. Test the `recovery` account password at the provider's out-of-band console. Keep that path available until networking is stable.
-4. Keep `.deployment/generated/machine.nix`, `.deployment/generated/facter.json`, `.deployment/flake.lock` and the rest of `.deployment/` privately on the deployment computer for [future updates](update.md). Back them up off-server.
+## 4. Apply only the reviewed plan
 
-If a post-install service needs repair, use the [non-destructive update](update.md), not the disk installer. See [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md) for feature-specific steps.
+**Stop unless off-host backups and console recovery work.** Then:
+
+```bash
+moss machine apply --target root@HOST
+```
+
+`apply` repeats the build, consumer checks, target probe and pushed-tip check. If anything changed, **stop and make a new plan**. Only after these checks does it demand `ERASE /dev/WHOLE_DISK` and invoke `nixos-anywhere`/Disko. The recovery hash travels via separate `--extra-files`, never via Nix source.
+
+If installation succeeds but the receipt is missing, **do not rerun the installer**. Inspect the installed revision via the console. Back up the receipt and original machine files off-host.
+
+## 5. Verify the *new* host key and bootstrap
+
+Check the installed host's new SSH fingerprint through the provider console before updating `known_hosts`:
+
+```bash
+moss machine bootstrap "$PWD/.moss/root@HOST/install-receipt.json"
+```
+
+Bootstrap verifies the receipt and original private inputs, creates a root-owned checkout at the installed commit and pins the host to **`commit:INSTALLED_SHA`**. The timer is present but performs no update until an operator explicitly selects a branch. If interrupted, retry bootstrap with the *same* receipt; never reinstall as a repair.
+
+If configured, upload GitHub App credentials **separately** with `bash scripts/deployment/credentials.sh root@HOST`. Verify network, SSH, console recovery, `agentic-firstboot-check` and agentic services. See [updates and recovery](update.md).

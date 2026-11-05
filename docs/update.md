@@ -1,54 +1,51 @@
-# Update an existing Agentic NixOS machine
+# Update an agentic NixOS host
 
-Use this guide only for a machine already installed and reachable by root SSH. **Do not rerun `scripts/install/deploy.sh --install`: it invokes Disko and erases the selected disk.** `scripts/update/apply.sh` evaluates, confirms and switches an existing installation without repartitioning.
+> **Never use `install` to repair an existing host:** it invokes Disko. Merging this PR does not change a live machine.
 
-## 1. Update the local repository
+First determine **which path the host uses**:
 
-On the deployment computer, use the **same checkout** that contains the machine's `.deployment/`. If it is a Git checkout tracking `main`, review your changes and update it with a fast-forward only:
+| Host | Update path |
+| --- | --- |
+| Bootstrapped with `moss` | Root-owned checkout; target polls its selected reference. |
+| Installed before toolkit adoption | Existing **manual** `.deployment/` update until [#32](https://github.com/benjaminpreiss/agentic/issues/32) verifies migration. |
 
-```bash
-git status --short
-git switch main
-git pull --ff-only origin main
-```
+## Moss-managed host: plan before applying an update
 
-Stop if Git reports local conflicts, a non-fast-forward history, or uncommitted changes you have not reviewed. Do **not** reset, clean or delete `.deployment/` to make the pull work. If this is an archive rather than a Git checkout, obtain the new source without replacing or discarding the private `.deployment/` and `secrets/` directories; verify they remain in this checkout before applying. `git pull` changes tracked code, not Git-ignored machine records.
+- 🔒 **`commit:FULL_SHA`:** pinned. The timer fires, but does *not* fetch, build or switch. New installs start here.
+- 🔎 **`branch:NAME`:** checks *only that branch*. A new eligible tip is built before switching. `branch:candidate` ignores pushes to `main`.
 
-> ⚠️ **Action required before applying:** Check [`docs/upgrades/`](upgrades/) for notes relevant to the changes you just pulled. These one-time instructions live outside this routine guide; follow any applicable note when it says to (before or after the switch).
+The selector and known-good revision live in `/var/lib/agentic/deployment`, **outside fetched source**. The target has a root-owned checkout in `/var/lib/agentic/source` and private machine facts in `/var/lib/agentic/machine`. Protect any production branch with reviewed PRs and required checks; a successful build does not prove a safe boot.
 
-## 2. Check the machine and private deployment state
-
-Confirm root SSH and your provider's out-of-band console still work. Keep an off-server backup. Check that the existing deployment is intact:
+**For a host already tracking a branch**, on the operator computer in the [pinned `moss` shell](install.md#1-before-connecting): push the intended commit to its selected branch, change only `revision` in the ignored `.moss/root@HOST/machine.json` to that **full pushed SHA** (keep its mode `0600`), then:
 
 ```bash
-ls -l .deployment/flake.lock .deployment/generated/machine.nix \
-  .deployment/generated/facter.json .deployment/target.txt
-cat .deployment/target.txt
+moss machine plan root@HOST
+# Review the immutable new update plan in .moss/root@HOST/plans/.
+moss machine apply --target root@HOST
 ```
 
-The generated machine configuration, hardware report, lock file, recovery password hash and target belong to this machine; **do not replace them with files from another machine**. If any are missing, recover the original `.deployment/` backup before updating. Review local changes to credentials separately; [GitHub App credentials](github-app.md) are uploaded via SSH, never copied into the flake.
+The CLI checks the receipt and live selector, exact pushed tip, original machine facts and origin before the switch. **An update plan never invokes Disko.** If any check differs, stop and make a new plan; never edit the receipt or root-owned state to bypass it. Scheduled updates to a selected branch use the same target-side checks, without an off-host plan.
 
-## 3. Run local checks
+**Changing from a commit pin to branch tracking is not yet a public `moss` command.** Fresh bootstrap pins a commit and cannot be updated via `machine plan` until a reviewed transition is exposed upstream. Keep new hosts pinned; do not call private `packages/cli/bin/machine/deploy.sh` or edit selector state. A divergent branch (e.g. after a squash merge) also needs a separate reviewed transition. See the [pinned CLI guide](https://github.com/benjaminpreiss/themoss.net/blob/18ab6e8da7d8ff828cf9e9188221d3d2fcde830c/packages/cli/src/machine/README.md).
 
-From the repository root:
+### Failure or recovery
 
-```bash
-bash scripts/test-stage.sh
-bash scripts/github/test-configure-git-credentials.sh
-```
+1. **Fetch, check or build failed?** No switch or state advance occurred; diagnose before retrying.
+2. **Switch started, then failed?** Stop `themoss-update.timer`. Inspect `/var/lib/agentic/deployment/needs-inspection`, `journalctl -u themoss-update`, the active system and `nixos-rebuild list-generations`. Use SSH or the console to recover/roll back; reconcile state *before* restarting the timer.
+3. **Secrets or user-managed tools changed?** The poller never uploads GitHub App keys. Transfer them separately with `bash scripts/deployment/credentials.sh root@HOST`. After a reviewed change, verify SSH, networking, Pi/OMP, skills, GitHub audit and nono packs. The former manual updater ran `nono pull nolabs-ai/pi` and `nono pull nolabs-ai/omp`; on moss-managed hosts, run/verify these as `agentic` when those packs need updating.
 
-Stop if either test fails. Both installation and update use `scripts/stage.sh` to refresh declared, credential-free modules, runtime code, profiles, audit code and selected skills. Staging leaves machine-specific files and `flake.lock` untouched; it is not a copy of the whole repository.
+### Update the moss pin
 
-## 4. Evaluate and switch — no disk formatting
+Propose a PR changing the `themoss` flake input and **committed root `flake.lock`**. Run `bash tests/deployment.sh` and test a disposable VM before merging. Each branch-tracking target receives the change only when *its selected branch* advances. No runtime `curl | sh` or private credential is staged.
 
-```bash
-bash scripts/update/apply.sh
-```
+## Existing host: keep the manual path for now
 
-The script stages sources and evaluates the complete NixOS derivation **before** asking for confirmation. Review any failure rather than falling back to the installer. If you confirm, it uploads configured GitHub App credentials separately, runs remote `nixos-rebuild switch`, and then prepares and verifies nono packs. No Disko command is run.
+The original deployment did **not** record a Git revision. `f73e8ca` is an operator-reported candidate, not a verified running baseline. [#32](https://github.com/benjaminpreiss/agentic/issues/32) will compare the actual generation, the old private `.deployment/flake.lock` and preserved machine files, then use the toolkit's receipt-less `adopt` path. Any difference between private and committed locks is a **reviewed dependency update**, not an automatic replacement.
 
-## 5. Verify and recover
+Until then:
 
-Reconnect as `agentic`. Confirm SSH and networking, then check the services or harnesses affected by your change. For feature-specific checks, see [sandbox and skills](sandbox.md) or [GitHub setup](github-app.md).
+1. Back up and retain the original private `.deployment/` (including `generated/`, `extra-files/`, target and lock) plus `secrets/` **off-host**.
+2. From the *same checkout*, run `bash tests/stage.sh` and `bash tests/configure-git-credentials.sh`.
+3. Run `bash scripts/update/apply.sh` for a manual non-destructive update. It stages into the old private deployment and does not run Disko. Preserve known-good generations if switching fails; use the console, not the installer, to recover.
 
-If evaluation fails, no switch has occurred. If switching fails, preserve the known-good NixOS generation and diagnose via SSH or the provider console; **never run the disk installer as a repair step**. Server-local backups are not off-server backups. Unattended system upgrades remain disabled.
+The legacy script remains solely to keep existing hosts operable until #32. **Do not infer a revision, delete `.deployment/` or enable branch polling on one merely because this PR merges.**
