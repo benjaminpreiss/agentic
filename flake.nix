@@ -8,7 +8,7 @@
     omp.url = "github:can1357/oh-my-pi";
     nono.url = "github:nolabs-ai/nono";
     herdr.url = "github:herdrdev/herdr";
-    themoss.url = "github:benjaminpreiss/themoss.net/05f25bf2e700deb55c59882d00e781a1e1583d07";
+    themoss.url = "github:benjaminpreiss/themoss.net/18ab6e8da7d8ff828cf9e9188221d3d2fcde830c";
   };
   outputs = inputs@{ nixpkgs, disko, ... }: {
     toolkitPath = inputs.themoss.outPath;

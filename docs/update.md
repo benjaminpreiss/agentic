@@ -16,7 +16,7 @@ First determine **which path the host uses**:
 
 The selector and known-good revision live in `/var/lib/agentic/deployment`, **outside fetched source**. The target has a root-owned checkout in `/var/lib/agentic/source` and private machine facts in `/var/lib/agentic/machine`. Protect any production branch with reviewed PRs and required checks; a successful build does not prove a safe boot.
 
-To change selection, use the [pinned toolkit's `deploy` or `transition` commands](https://github.com/benjaminpreiss/themoss.net/blob/05f25bf2e700deb55c59882d00e781a1e1583d07/docs/updates.md). A manual branch deployment must use its **current pushed tip**. If moving between branches breaks ancestry—such as after a squash merge—use an explicit, reviewed, *non-destructive* transition. Polling refuses divergent history.
+**Branch selection is not yet a public `moss` command.** The CLI supports `machine plan` and `machine apply` for a host *already tracking a branch*, but fresh bootstrap pins a commit. Keep a new host pinned until themoss.net exposes a reviewed operator transition; do not call its private `packages/cli/bin/machine/deploy.sh` directly or edit selector state. A divergent branch (such as after a squash merge) must still require an explicit, non-destructive transition. See the [pinned toolkit's machine guide](https://github.com/benjaminpreiss/themoss.net/blob/18ab6e8da7d8ff828cf9e9188221d3d2fcde830c/packages/cli/src/machine/README.md).
 
 ### Failure or recovery
 

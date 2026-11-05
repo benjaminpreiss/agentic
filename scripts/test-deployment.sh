@@ -3,9 +3,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 bash "$ROOT/scripts/test-stage.sh"
+bash "$ROOT/scripts/test-prepare.sh"
 bash "$ROOT/scripts/github/test-configure-git-credentials.sh"
-[[ $(jq -r '.nodes.themoss.locked.rev' "$ROOT/flake.lock") == 05f25bf2e700deb55c59882d00e781a1e1583d07 ]]
-[[ $(nix --extra-experimental-features 'nix-command flakes' eval --raw --no-write-lock-file "path:$ROOT#toolkitPath") == /nix/store/* ]]
+[[ $(jq -r '.nodes.themoss.locked.rev' "$ROOT/flake.lock") == 18ab6e8da7d8ff828cf9e9188221d3d2fcde830c ]]
+toolkit=$(nix --extra-experimental-features 'nix-command flakes' eval --raw --no-write-lock-file "path:$ROOT#toolkitPath")
+[[ $toolkit == /nix/store/* && -x $toolkit/packages/cli/bin/moss ]]
+[[ $(bash "$ROOT/scripts/deployment/toolkit.sh" --version) == moss\ * ]]
+[[ ! -e $ROOT/.moss || -d $ROOT/.moss ]]
 # Git archive of the next commit must be symlink-free: this is a requirement of
 # the shared staging interface, not a license to archive secrets.
 if git -C "$ROOT" ls-files -s | grep -q '^120000 '; then echo 'Committed symlink prevents toolkit staging' >&2; exit 1; fi

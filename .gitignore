@@ -1,4 +1,5 @@
 /.deployment/
+/.moss/
 /.deployment.stage.*/
 /.deployment.fixture.*/
 /generated/

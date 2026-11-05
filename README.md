@@ -23,16 +23,16 @@ A composable repository for building and maintaining an agentic machine. It brin
 
 ### 🖥️ Machine deployment
 
-- [Fresh NixOS installation](docs/install.md) with nixos-anywhere and Disko (**erases the selected disk**).
+- [Fresh NixOS installation](docs/install.md) via the pinned `moss machine plan → apply → bootstrap` CLI (**`apply` erases the selected disk only after typed confirmation**).
 - [Non-destructive updates](docs/update.md): toolkit-managed hosts poll their operator-selected branch or stay pinned to a commit (**no Disko**). Existing hosts retain the manual SSH update until individually migrated.
 
 ## Repository map
 
 - `flake.nix`, `flake.lock`, `deployment/`: reviewed toolkit-managed flake, dependency pins and agentic-specific modules.
 - `nixos/`, `scripts/update/`, `scripts/stage.sh`: temporary legacy manual update path for existing hosts; do not remove before migration. `scripts/install/recovery-password.sh` only prepares a new host's private recovery hash.
-- `scripts/deployment/`: thin pinned-toolkit invoker, machine preparation and agentic-specific hooks.
+- `scripts/deployment/`: thin pinned `moss` CLI invoker, agentic-specific machine preparation and evaluated install hooks.
 - `scripts/runtime/`, `scripts/github/`, `github-protection/`: host-side GitHub credentials, setup and protection audits.
 - `skills/available/`, `skills/enabled.nix`: versioned skills and their reviewed selection.
 - `docs/`: task guides, security guidance, upgrade notes and decisions.
 
-`.deployment/` holds private machine facts and (for existing hosts only) their original lockfile; preserve it off-host and never commit it. New hosts use the committed root lockfile. `secrets/` holds local GitHub App credentials and is Git-ignored. **Never put private keys, hashes or tokens in Nix source or the store.** Only hosts explicitly bootstrapped and switched to branch tracking perform autonomous OS updates.
+`.moss/` holds ignored operator-local machine configurations, plans and receipts; `.deployment/` holds private machine facts and (for existing hosts only) their original lockfile. Back both up off-host and never commit them. New hosts use the committed root lockfile. `secrets/` holds local GitHub App credentials and is Git-ignored. **Never put private keys, hashes or tokens in Nix source or the store.** Only hosts explicitly bootstrapped and switched to branch tracking perform autonomous OS updates.

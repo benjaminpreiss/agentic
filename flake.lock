@@ -462,17 +462,17 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1793587181,
-        "narHash": "sha256-TFTx7JkNO6mpRcT/lrQtULnnoJYyGWxT9UD6HkKrehQ=",
+        "lastModified": 1793891087,
+        "narHash": "sha256-Ac66qdmJFl4gpger5d8HyqS1HENkXIpIJzWkdA/CY48=",
         "owner": "benjaminpreiss",
         "repo": "themoss.net",
-        "rev": "05f25bf2e700deb55c59882d00e781a1e1583d07",
+        "rev": "18ab6e8da7d8ff828cf9e9188221d3d2fcde830c",
         "type": "github"
       },
       "original": {
         "owner": "benjaminpreiss",
         "repo": "themoss.net",
-        "rev": "05f25bf2e700deb55c59882d00e781a1e1583d07",
+        "rev": "18ab6e8da7d8ff828cf9e9188221d3d2fcde830c",
         "type": "github"
       }
     },
