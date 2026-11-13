@@ -1,6 +1,11 @@
 {
   "id": "agentic",
   "module": "linux-local-account",
-  "bindings": {"os-base@1": "host", "login-shell@1": "interactive"},
-  "inputs": {"account_name": "agentic"}
+  "bindings": {
+    "os-base@1": "host",
+    "login-shell@1": "interactive"
+  },
+  "inputs": {
+    "account_name": "agentic"
+  }
 }

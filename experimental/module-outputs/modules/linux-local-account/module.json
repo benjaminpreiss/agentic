@@ -3,22 +3,24 @@
   "implements": "account@1",
   "entrypoint": "ensure",
   "requires": [
-    {"interface": "os-base@1", "methods": {
-      "ensure": {"args": {}, "outputs": {}}
-    }},
-    {"interface": "login-shell@1", "methods": {
-      "ensure": {"args": {}, "outputs": {"path": "string"}}
-    }}
+    "os-base@1",
+    "login-shell@1"
   ],
   "inputs": {
-    "account_name": {"type": "string", "source": "config"},
-    "shell_path": {"type": "string", "from": {
-      "interface": "login-shell@1", "method": "ensure", "output": "path"
-    }}
-  },
-  "provides": {
-    "account@1": {
-      "ensure": {"args": {}, "outputs": {}, "script": "ensure.yml"}
+    "account_name": {
+      "type": "string",
+      "source": "config"
+    },
+    "shell_path": {
+      "type": "string",
+      "from": {
+        "interface": "login-shell@1",
+        "method": "ensure",
+        "output": "path"
+      }
     }
+  },
+  "operations": {
+    "ensure": "ensure.yml"
   }
 }

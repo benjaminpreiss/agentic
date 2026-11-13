@@ -1,0 +1,13 @@
+{
+  "id": "login-shell@1",
+  "description": "A login shell available on the target host.",
+  "methods": {
+    "ensure": {
+      "args": {},
+      "outputs": {
+        "path": "string"
+      },
+      "guarantee": "path is an absolute, executable path on the target and is listed in its login-shell registry."
+    }
+  }
+}

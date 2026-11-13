@@ -1,0 +1,11 @@
+{
+  "id": "os-base@1",
+  "description": "A prepared operating-system substrate for native modules.",
+  "methods": {
+    "ensure": {
+      "args": {},
+      "outputs": {},
+      "guarantee": "The target OS and required recovery preconditions have been checked."
+    }
+  }
+}

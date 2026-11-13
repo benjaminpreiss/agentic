@@ -3,13 +3,9 @@
   "implements": "login-shell@1",
   "entrypoint": "ensure",
   "requires": [
-    {"interface": "os-base@1", "methods": {
-      "ensure": {"args": {}, "outputs": {}}
-    }}
+    "os-base@1"
   ],
-  "provides": {
-    "login-shell@1": {
-      "ensure": {"args": {}, "outputs": {"path": "string"}, "script": "ensure.yml"}
-    }
+  "operations": {
+    "ensure": "ensure.yml"
   }
 }
