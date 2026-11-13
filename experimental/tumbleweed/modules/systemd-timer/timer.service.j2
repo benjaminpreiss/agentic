@@ -1,0 +1,8 @@
+# Managed by agentic systemd-timer@1
+[Unit]
+Description=Agentic scheduled job {{ timer_id }}
+
+[Service]
+Type=oneshot
+User=root
+ExecStart={{ timer_command }}

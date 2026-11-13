@@ -1,0 +1,4 @@
+---
+- name: Refuse to install mutable or unversioned skill links
+  ansible.builtin.fail:
+    msg: 'BLOCKED: stage pinned skills/enabled, check directory ownership, and preserve user-managed skill files before linking.'

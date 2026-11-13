@@ -1,0 +1,43 @@
+---
+# timer@1.remove(id): only remove units this provider owns.
+- name: Validate timer identity
+  ansible.builtin.assert:
+    that: timer_id is match('^[a-z][a-z0-9-]*$')
+
+- name: Inspect managed units before removal
+  ansible.builtin.stat:
+    path: '/etc/systemd/system/{{ timer_id }}.{{ item }}'
+  loop: [timer, service]
+  register: existing_units
+
+- name: Read existing units before removal
+  ansible.builtin.slurp:
+    src: '{{ item.stat.path }}'
+  loop: '{{ existing_units.results }}'
+  when: item.stat.exists
+  register: existing_contents
+
+- name: Refuse to delete units not managed by this provider
+  ansible.builtin.assert:
+    that: "'# Managed by agentic systemd-timer@1' in (item.content | b64decode)"
+  loop: '{{ existing_contents.results }}'
+  when: item.content is defined
+
+- name: Stop and disable managed timer
+  ansible.builtin.systemd_service:
+    name: '{{ timer_id }}.timer'
+    state: stopped
+    enabled: false
+  when: existing_units.results[0].stat.exists
+
+- name: Remove managed units
+  ansible.builtin.file:
+    path: '/etc/systemd/system/{{ timer_id }}.{{ item }}'
+    state: absent
+  loop: [timer, service]
+  register: removed_units
+
+- name: Reload systemd after unit removal
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: removed_units.changed

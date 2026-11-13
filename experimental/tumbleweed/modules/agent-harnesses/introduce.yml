@@ -1,0 +1,20 @@
+---
+# User data should not be overwritten by a rerun.
+- name: Create agentic user without sudo
+  ansible.builtin.user:
+    name: agentic
+    shell: /bin/zsh
+    create_home: true
+    # Do not rewrite supplementary groups on an existing user.
+
+- name: Create agentic work directory
+  ansible.builtin.file:
+    path: /home/agentic/work
+    state: directory
+    owner: agentic
+    group: users
+    mode: '0750'
+
+- name: Stop before advertising unsandboxed harness commands
+  ansible.builtin.fail:
+    msg: 'BLOCKED: Pi/OMP, Nix packages, terminfo and sandboxed launchers have not been introduced; do not expose raw binaries.'

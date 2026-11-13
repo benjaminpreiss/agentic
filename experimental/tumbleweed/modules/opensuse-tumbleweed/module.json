@@ -1,0 +1,1 @@
+{"id":"opensuse-tumbleweed","version":"rolling","substrate":"native","status":"external: fresh VM image required","requires_interfaces":[],"implements":"os-base@1","entrypoint":"ensure","provides":{"os-base@1":{"ensure":{"args":{},"script":"introduce.yml"}}}}

@@ -1,0 +1,15 @@
+---
+# Never change an SSH/network/firewall path without confirmed console recovery.
+- name: Require verified out-of-band recovery before provisioning base access
+  ansible.builtin.assert:
+    that: agentic_console_verified | default(false) | bool
+    fail_msg: 'Verify the provider console on this fresh VM before changing base access.'
+
+- name: Install the minimal tools used by following introductions
+  ansible.builtin.package:
+    name: [git, curl, zsh, python3, tar, gzip]
+    state: present
+
+- name: Verify SSH remains accessible after package installation
+  ansible.builtin.command: systemctl is-active sshd
+  changed_when: false

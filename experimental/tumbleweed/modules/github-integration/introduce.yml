@@ -1,0 +1,4 @@
+---
+- name: Refuse to put GitHub App credentials in a repository or Nix store
+  ansible.builtin.fail:
+    msg: 'BLOCKED: port credential files outside the store, MCP/credential sockets, and branch protection audit; never distribute private keys with modules.'

@@ -1,0 +1,5 @@
+---
+# Pin and verify a multi-user Nix installer before automating bootstrap.
+- name: Refuse to install unpinned Nix as root
+  ansible.builtin.fail:
+    msg: 'BLOCKED: supply a reviewed, pinned multi-user Nix installer and VM test; no curl-to-root bootstrap in this prototype.'
