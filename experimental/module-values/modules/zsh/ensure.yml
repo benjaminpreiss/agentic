@@ -1,0 +1,25 @@
+---
+# provided_path is declared by the Zsh module and expanded before Ansible runs.
+- name: Install Zsh using the substrate package manager
+  ansible.builtin.package:
+    name: zsh
+    state: present
+
+- name: Inspect the declared login-shell path
+  ansible.builtin.stat:
+    path: '{{ provided_path }}'
+    follow: true
+  register: shell_file
+
+- name: Read registered login shells
+  ansible.builtin.slurp:
+    src: /etc/shells
+  register: login_shells
+
+- name: Verify the declaration holds on the target
+  ansible.builtin.assert:
+    that:
+      - provided_path is match('^/')
+      - shell_file.stat.isreg | default(false)
+      - shell_file.stat.executable | default(false)
+      - provided_path in (login_shells.content | b64decode).splitlines()

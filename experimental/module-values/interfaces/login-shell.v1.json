@@ -1,0 +1,16 @@
+{
+  "id": "login-shell@1",
+  "description": "A login shell available on the target host.",
+  "values": {
+    "path": {
+      "type": "absolute-path",
+      "guarantee": "This is the path the provider intends to install as a login shell."
+    }
+  },
+  "transitions": {
+    "ensure": {
+      "args": {},
+      "guarantee": "The declared path exists, is executable, and is listed in the target's login-shell registry."
+    }
+  }
+}

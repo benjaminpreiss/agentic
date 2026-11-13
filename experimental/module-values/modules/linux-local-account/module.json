@@ -1,0 +1,12 @@
+{
+  "id": "linux-local-account",
+  "implements": "account@1",
+  "entrypoint": "ensure",
+  "requires": ["os-base@1", "login-shell@1"],
+  "config": {"account_name": "string"},
+  "uses": [
+    {"interface": "login-shell@1", "value": "path", "as": "shell_path"}
+  ],
+  "values": {},
+  "transitions": {"ensure": "ensure.yml"}
+}

@@ -3,7 +3,6 @@
   "implements": "os-base@1",
   "entrypoint": "ensure",
   "requires": [],
-  "operations": {
-    "ensure": "ensure.yml"
-  }
+  "values": {},
+  "transitions": {"ensure": "ensure.yml"}
 }

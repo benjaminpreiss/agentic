@@ -1,0 +1,8 @@
+{
+  "id": "zsh",
+  "implements": "login-shell@1",
+  "entrypoint": "ensure",
+  "requires": ["os-base@1"],
+  "values": {"path": "/usr/bin/zsh"},
+  "transitions": {"ensure": "ensure.yml"}
+}
