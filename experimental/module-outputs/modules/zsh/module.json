@@ -1,10 +1,9 @@
 {
   "id": "zsh",
-  "instance": "interactive",
   "implements": "login-shell@1",
   "entrypoint": "ensure",
   "requires": [
-    {"interface": "os-base@1", "instance": "host", "methods": {
+    {"interface": "os-base@1", "methods": {
       "ensure": {"args": {}, "outputs": {}}
     }}
   ],

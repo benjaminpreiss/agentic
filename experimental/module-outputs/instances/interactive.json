@@ -1,0 +1,6 @@
+{
+  "id": "interactive",
+  "module": "zsh",
+  "bindings": {"os-base@1": "host"},
+  "inputs": {}
+}

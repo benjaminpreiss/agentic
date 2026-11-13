@@ -1,6 +1,5 @@
 {
   "id": "opensuse-tumbleweed",
-  "instance": "host",
   "implements": "os-base@1",
   "entrypoint": "ensure",
   "requires": [],

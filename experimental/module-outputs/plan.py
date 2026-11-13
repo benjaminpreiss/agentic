@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Experimental planner: local interfaces, bound instances and runtime outputs."""
+"""Experimental instance planner: local interfaces, bindings and runtime outputs."""
 import json
 import re
 import sys
@@ -16,72 +16,103 @@ def valid_signature(signature):
     return isinstance(signature, dict) and all(ARG.fullmatch(k) and v == "string" for k, v in signature.items())
 
 
-def key(interface, instance):
-    if not isinstance(interface, str) or not INTERFACE.fullmatch(interface) or not isinstance(instance, str) or not NAME.fullmatch(instance):
-        raise ValueError(f"invalid interface instance: {interface}#{instance}")
+def result_key(interface, instance):
     return f"{interface}#{instance}"
 
 
 def plan(root=ROOT):
-    bindings = json.loads((root / "bindings.json").read_text())
     modules = {}
     for file in sorted((root / "modules").glob("*/module.json")):
         module = json.loads(file.read_text())
         identifier = module["id"]
-        if not isinstance(identifier, str) or not NAME.fullmatch(identifier) or identifier != file.parent.name or identifier in modules:
+        if not NAME.fullmatch(identifier) or identifier != file.parent.name or identifier in modules:
             raise ValueError(f"invalid or duplicate module: {file}")
-        contract = key(module["implements"], module["instance"])
-        if bindings.get(contract) != identifier:
-            raise ValueError(f"missing binding for implementation: {contract}")
-        operations = module["provides"].get(module["implements"])
+        interface = module["implements"]
+        if not INTERFACE.fullmatch(interface):
+            raise ValueError(f"invalid provided interface: {identifier}")
+        operations = module["provides"].get(interface)
         if not isinstance(operations, dict) or not operations:
             raise ValueError(f"module does not describe provided interface: {identifier}")
         for name, operation in operations.items():
             script = operation.get("script")
             if not NAME.fullmatch(name) or not valid_signature(operation.get("args")) or not valid_signature(operation.get("outputs")):
-                raise ValueError(f"invalid provided method: {identifier}.{name}")
+                raise ValueError(f"invalid method: {identifier}.{name}")
             if not isinstance(script, str) or not SCRIPT.fullmatch(script) or not (file.parent / script).is_file():
                 raise ValueError(f"missing operation script: {identifier}.{name}")
         entrypoint = operations.get(module["entrypoint"])
         if entrypoint is None or entrypoint["args"]:
             raise ValueError(f"entrypoint must take no public arguments: {identifier}")
+        if not isinstance(module.get("requires"), list):
+            raise ValueError(f"invalid required interfaces: {identifier}")
+        inputs = module.get("inputs", {})
+        if not isinstance(inputs, dict) or any(not ARG.fullmatch(name) or not isinstance(spec, dict) or spec.get("type") != "string" for name, spec in inputs.items()):
+            raise ValueError(f"invalid input declarations: {identifier}")
         modules[identifier] = module
 
-    for binding, identifier in bindings.items():
-        if identifier not in modules or key(modules[identifier]["implements"], modules[identifier]["instance"]) != binding:
-            raise ValueError(f"invalid binding: {binding} -> {identifier}")
+    instances = {}
+    for file in sorted((root / "instances").glob("*.json")):
+        instance = json.loads(file.read_text())
+        identifier = instance["id"]
+        if not NAME.fullmatch(identifier) or file.stem != identifier or identifier in instances:
+            raise ValueError(f"invalid or duplicate instance: {file}")
+        module_name = instance["module"]
+        if module_name not in modules:
+            raise ValueError(f"unknown module for instance {identifier}: {module_name}")
+        instance["_module"] = modules[module_name]
+        instances[identifier] = instance
 
-    for identifier, module in modules.items():
+    for identifier, instance in instances.items():
+        module = instance["_module"]
         required = {}
         dependencies = []
+        bindings = instance.get("bindings", {})
+        if not isinstance(bindings, dict):
+            raise ValueError(f"invalid bindings for {identifier}")
         for requirement in module["requires"]:
-            bound = key(requirement["interface"], requirement["instance"])
-            if bound in required or bound not in bindings:
-                raise ValueError(f"duplicate or unbound requirement: {identifier} -> {bound}")
-            provider = modules[bindings[bound]]
-            expected = requirement["methods"]
-            actual = provider["provides"][requirement["interface"]]
+            interface, expected = requirement["interface"], requirement["methods"]
+            if not INTERFACE.fullmatch(interface) or interface in required or interface not in bindings:
+                raise ValueError(f"missing or duplicate binding: {identifier} -> {interface}")
+            provider_id = bindings[interface]
+            if provider_id not in instances or provider_id == identifier:
+                raise ValueError(f"unknown or self provider: {identifier} -> {provider_id}")
+            provider = instances[provider_id]["_module"]
+            if provider["implements"] != interface:
+                raise ValueError(f"binding does not provide {interface}: {identifier} -> {provider_id}")
+            actual = provider["provides"][interface]
             if not isinstance(expected, dict) or not expected:
-                raise ValueError(f"empty required interface: {identifier} -> {bound}")
+                raise ValueError(f"empty required interface: {identifier} -> {interface}")
             for name, signature in expected.items():
                 method = actual.get(name)
                 if method is None or not valid_signature(signature.get("args")) or not valid_signature(signature.get("outputs")):
-                    raise ValueError(f"invalid method requirement: {identifier} -> {bound}.{name}")
+                    raise ValueError(f"invalid required method: {identifier} -> {interface}.{name}")
                 if signature["args"] != method["args"] or any(method["outputs"].get(output) != typ for output, typ in signature["outputs"].items()):
-                    raise ValueError(f"incompatible method: {identifier} -> {bound}.{name}")
-            required[bound] = expected
-            dependencies.append(provider["id"])
-        inputs = module.get("inputs", {})
-        if not isinstance(inputs, dict) or any(not ARG.fullmatch(name) for name in inputs):
-            raise ValueError(f"invalid inputs: {identifier}")
-        for name, input_spec in inputs.items():
-            source = input_spec["from"]
-            bound = key(source["interface"], source["instance"])
-            method = required.get(bound, {}).get(source["method"], {})
-            output_type = method.get("outputs", {}).get(source["output"])
-            if output_type != input_spec["type"] or input_spec["type"] != "string":
-                raise ValueError(f"unavailable or incompatible output: {identifier}.{name}")
-        module["_dependencies"] = dependencies
+                    raise ValueError(f"incompatible method: {identifier} -> {interface}.{name}")
+            required[interface] = expected
+            dependencies.append(provider_id)
+        if set(bindings) != set(required):
+            raise ValueError(f"unused binding on {identifier}")
+        literal_inputs = instance.get("inputs", {})
+        input_specs = module.get("inputs", {})
+        if not isinstance(literal_inputs, dict) or set(literal_inputs) != {name for name, spec in input_specs.items() if spec.get("source") == "config"}:
+            raise ValueError(f"missing or unexpected instance input: {identifier}")
+        resolved_inputs = {}
+        for name, spec in input_specs.items():
+            if spec.get("source") == "config":
+                value = literal_inputs[name]
+                if not isinstance(value, str):
+                    raise ValueError(f"invalid instance input type: {identifier}.{name}")
+                resolved_inputs[name] = ("literal", value)
+            else:
+                source = spec.get("from", {})
+                interface, method_name, output = source.get("interface"), source.get("method"), source.get("output")
+                declared = required.get(interface, {}).get(method_name, {})
+                provider = instances[bindings[interface]]["_module"] if interface in bindings else None
+                if (declared.get("outputs", {}).get(output) != spec["type"]
+                        or provider is None or method_name != provider["entrypoint"]):
+                    raise ValueError(f"unavailable or incompatible output: {identifier}.{name}")
+                resolved_inputs[name] = ("output", result_key(interface, bindings[interface]), output)
+        instance["_dependencies"] = dependencies
+        instance["_inputs"] = resolved_inputs
 
     ordered, active, done = [], set(), set()
     def visit(identifier):
@@ -90,32 +121,35 @@ def plan(root=ROOT):
         if identifier in done:
             return
         active.add(identifier)
-        for dep in modules[identifier]["_dependencies"]:
+        for dep in instances[identifier]["_dependencies"]:
             visit(dep)
         active.remove(identifier)
         done.add(identifier)
-        ordered.append(modules[identifier])
-    for identifier in modules:
+        ordered.append(instances[identifier])
+    for identifier in instances:
         visit(identifier)
     return ordered
 
 
 def playbook(ordered):
-    lines = ["---", "- name: Experiment with module outputs on a disposable Tumbleweed VM",
+    lines = ["---", "- name: Experiment with reusable modules on a disposable Tumbleweed VM",
              "  hosts: agentic_vm", "  gather_facts: true", "  become: true",
              "  pre_tasks:", "    - name: Discard results from any previous run",
              "      ansible.builtin.set_fact:", "        deployment_results: {}", "  tasks:"]
-    for module in ordered:
-        operation = module["provides"][module["implements"]][module["entrypoint"]]
-        bound = key(module["implements"], module["instance"])
-        lines += [f"    - name: Ensure {bound}",
+    for instance in ordered:
+        module = instance["_module"]
+        interface = module["implements"]
+        operation = module["provides"][interface][module["entrypoint"]]
+        bound = result_key(interface, instance["id"])
+        lines += [f"    - name: Ensure {bound} via {module['id']}",
                   f"      ansible.builtin.import_tasks: modules/{module['id']}/{operation['script']}",
                   "      vars:", f"        module_result_key: {json.dumps(bound)}"]
-        for name, input_spec in module.get("inputs", {}).items():
-            source = input_spec["from"]
-            result_key = key(source["interface"], source["instance"])
-            expr = f"{{{{ deployment_results[{result_key!r}][{source['output']!r}] }}}}"
-            lines.append(f"        {name}: {json.dumps(expr)}")
+        for name, value in instance["_inputs"].items():
+            if value[0] == "literal":
+                lines.append(f"        {name}: {json.dumps(value[1])}")
+            else:
+                expr = f"{{{{ deployment_results[{value[1]!r}][{value[2]!r}] }}}}"
+                lines.append(f"        {name}: {json.dumps(expr)}")
         for output in operation["outputs"]:
             reference = f"deployment_results[{bound!r}][{output!r}]"
             lines += [f"    - name: Verify {bound} returned {output}",
@@ -133,8 +167,8 @@ if __name__ == "__main__":
         if sys.argv[1:] == ["--playbook"]:
             print(playbook(ordered), end="")
         elif not sys.argv[1:]:
-            for module in ordered:
-                print(key(module["implements"], module["instance"]))
+            for instance in ordered:
+                print(result_key(instance["_module"]["implements"], instance["id"]))
         else:
             raise ValueError("usage: plan.py [--playbook]")
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:

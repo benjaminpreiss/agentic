@@ -1,5 +1,0 @@
-{
-  "os-base@1#host": "opensuse-tumbleweed",
-  "login-shell@1#interactive": "zsh",
-  "account@1#agentic": "agentic-account"
-}
