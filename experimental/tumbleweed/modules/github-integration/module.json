@@ -1,1 +1,26 @@
-{"id":"github-integration","version":"prototype-1","substrate":"sandbox@1","status":"not implemented: App PEM outside sandbox; MCP and token broker sockets, Git helper and protection audit","requires_interfaces":[{"interface":"sandbox@1","operations":{"ensure":{"args":{}}}}],"implements":"github-integration@1","entrypoint":"ensure","provides":{"github-integration@1":{"ensure":{"args":{},"script":"introduce.yml"}}}}
+{
+  "id": "github-integration",
+  "version": "prototype-1",
+  "substrate": "sandbox@1",
+  "status": "not implemented: App PEM outside sandbox; MCP and token broker sockets, Git helper and protection audit",
+  "requires_interfaces": [
+    {
+      "interface": "sandbox@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    }
+  ],
+  "implements": "github-integration@1",
+  "entrypoint": "ensure",
+  "provides": {
+    "github-integration@1": {
+      "ensure": {
+        "args": {},
+        "script": "introduce.yml"
+      }
+    }
+  }
+}

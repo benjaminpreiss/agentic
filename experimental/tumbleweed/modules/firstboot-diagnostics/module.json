@@ -1,1 +1,34 @@
-{"id":"firstboot-diagnostics","version":"prototype-1","substrate":"os-base@1","status":"not implemented: network/SSH console checks and recovery verification","requires_interfaces":[{"interface":"base-access@1","operations":{"ensure":{"args":{}}}},{"interface":"os-base@1","operations":{"ensure":{"args":{}}}}],"implements":"firstboot-diagnostics@1","entrypoint":"ensure","provides":{"firstboot-diagnostics@1":{"ensure":{"args":{},"script":"introduce.yml"}}}}
+{
+  "id": "firstboot-diagnostics",
+  "version": "prototype-1",
+  "substrate": "os-base@1",
+  "status": "not implemented: network/SSH console checks and recovery verification",
+  "requires_interfaces": [
+    {
+      "interface": "base-access@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    },
+    {
+      "interface": "os-base@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    }
+  ],
+  "implements": "firstboot-diagnostics@1",
+  "entrypoint": "ensure",
+  "provides": {
+    "firstboot-diagnostics@1": {
+      "ensure": {
+        "args": {},
+        "script": "introduce.yml"
+      }
+    }
+  }
+}

@@ -1,1 +1,26 @@
-{"id":"agent-harnesses","version":"prototype-1","substrate":"nix-packages@1","status":"not implemented: agentic user/workspace, Zsh, Starship, Pi, OMP, Node, tooling, status screen","requires_interfaces":[{"interface":"nix-packages@1","operations":{"ensure":{"args":{}}}}],"implements":"agent-harnesses@1","entrypoint":"ensure","provides":{"agent-harnesses@1":{"ensure":{"args":{},"script":"introduce.yml"}}}}
+{
+  "id": "agent-harnesses",
+  "version": "prototype-1",
+  "substrate": "nix-packages@1",
+  "status": "not implemented: agentic user/workspace, Zsh, Starship, Pi, OMP, Node, tooling, status screen",
+  "requires_interfaces": [
+    {
+      "interface": "nix-packages@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    }
+  ],
+  "implements": "agent-harnesses@1",
+  "entrypoint": "ensure",
+  "provides": {
+    "agent-harnesses@1": {
+      "ensure": {
+        "args": {},
+        "script": "introduce.yml"
+      }
+    }
+  }
+}

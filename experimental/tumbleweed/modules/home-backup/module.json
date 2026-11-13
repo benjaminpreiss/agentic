@@ -1,1 +1,57 @@
-{"id":"home-backup","version":"prototype-1","substrate":"os-base@1","status":"scripted: local archive timer/retention; VM restore test and off-server backup pending","requires_interfaces":[{"interface":"agent-harnesses@1","operations":{"ensure":{"args":{}}}},{"interface":"timer@1","operations":{"ensure":{"args":{"id":"string","command":"string","schedule":"string"}}}},{"interface":"os-base@1","operations":{"ensure":{"args":{}}}}],"implements":"home-backup@1","entrypoint":"ensure","provides":{"home-backup@1":{"ensure":{"args":{},"script":"introduce.yml"}}},"calls":[{"interface":"timer@1","operation":"ensure","args":{"id":"agentic-backup","command":"/usr/local/libexec/agentic-backup","schedule":"*-*-* 03:30:00"}}]}
+{
+  "id": "home-backup",
+  "version": "prototype-1",
+  "substrate": "os-base@1",
+  "status": "scripted: local archive timer/retention; VM restore test and off-server backup pending",
+  "requires_interfaces": [
+    {
+      "interface": "agent-harnesses@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    },
+    {
+      "interface": "timer@1",
+      "operations": {
+        "ensure": {
+          "args": {
+            "id": "string",
+            "command": "string",
+            "schedule": "string"
+          }
+        }
+      }
+    },
+    {
+      "interface": "os-base@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    }
+  ],
+  "implements": "home-backup@1",
+  "entrypoint": "ensure",
+  "provides": {
+    "home-backup@1": {
+      "ensure": {
+        "args": {},
+        "script": "introduce.yml"
+      }
+    }
+  },
+  "calls": [
+    {
+      "interface": "timer@1",
+      "operation": "ensure",
+      "args": {
+        "id": "agentic-backup",
+        "command": "/usr/local/libexec/agentic-backup",
+        "schedule": "*-*-* 03:30:00"
+      }
+    }
+  ]
+}
