@@ -11,18 +11,19 @@ class ExpansionTests(unittest.TestCase):
         expanded = expand()
         self.assertEqual([item['id'] for item in expanded], ['host', 'interactive', 'agentic'])
         host, shell, account = expanded
-        self.assertEqual(host['provided']['login-shell-host@1']['zsh_path'], '/usr/bin/zsh')
         self.assertEqual(shell['provided']['login-shell@1']['path'], '/usr/bin/zsh')
+        self.assertEqual(shell['value_sources']['login-shell@1']['path'], {
+            'interface': 'login-shell-host@1', 'instance': 'host', 'lookup': 'path_for', 'argument': 'zsh'})
         self.assertEqual(account['args']['shell_path'], {'value': '/usr/bin/zsh', 'source': {
             'interface': 'login-shell@1', 'instance': 'interactive', 'value': 'path'}})
         self.assertEqual([step['script'] for item in expanded for step in item['actions']],
-                         ['ensure-os.sh', 'ensure-zsh.sh', 'ensure-account.sh'])
+                         ['ensure-os.sh', 'ensure-shell.sh', 'ensure-account.sh'])
         self.assertEqual(shell['actions'][0]['provider'], 'host')
         self.assertEqual(account['actions'][0]['provider'], 'host')
         self.assertEqual(account['actions'][0]['args'], ['agentic', '/usr/bin/zsh'])
         self.assertNotIn('ansible', json.dumps(expanded) + script(expanded))
         rendered = script(expanded)
-        self.assertIn("sh -s -- /usr/bin/zsh <<'AGENTIC_TASK_1'", rendered)
+        self.assertIn("sh -s -- zsh /usr/bin/zsh <<'AGENTIC_TASK_1'", rendered)
         self.assertIn("sh -s -- agentic /usr/bin/zsh <<'AGENTIC_TASK_2'", rendered)
         self.assertIn('AGENTIC_CONSOLE_VERIFIED', rendered)
 
@@ -37,7 +38,7 @@ class ExpansionTests(unittest.TestCase):
             self.assertEqual([item['id'] for item in expanded], ['host', 'interactive', 'agentic', 'reviewer'])
             self.assertEqual(expanded[-1]['actions'][0]['args'], ['reviewer', '/usr/bin/zsh'])
             rendered = script(expanded, root)
-            self.assertEqual(rendered.count('zypper -n install zsh'), 1)
+            self.assertEqual(rendered.count('zypper -n install "$shell_id"'), 1)
             self.assertEqual(rendered.count('useradd -m -s'), 2)
 
     def test_alternative_host_implementation_supplies_path_and_methods(self):
@@ -48,9 +49,9 @@ class ExpansionTests(unittest.TestCase):
             file = alternative / 'module.json'
             module = json.loads(file.read_text())
             module['id'] = 'alternative-host'
-            module['values']['login-shell-host@1']['zsh_path'] = '/opt/zsh/bin/zsh'
+            module['lookups']['login-shell-host@1']['path_for']['zsh'] = '/opt/zsh/bin/zsh'
             file.write_text(json.dumps(module))
-            (alternative / 'ensure-zsh.sh').write_text('echo alternative-substrate-method\n')
+            (alternative / 'ensure-shell.sh').write_text('echo alternative-substrate-method\n')
             host_file = root / 'instances/host.json'
             host = json.loads(host_file.read_text())
             host['module'] = 'alternative-host'
@@ -67,9 +68,13 @@ class ExpansionTests(unittest.TestCase):
             root = self.copy_experiment(Path(temporary))
             host_file = root / 'modules/opensuse-tumbleweed/module.json'
             host = json.loads(host_file.read_text())
-            host['values']['login-shell-host@1']['zsh_path'] = 'relative/zsh'
+            host['lookups']['login-shell-host@1']['path_for']['zsh'] = 'relative/zsh'
             host_file.write_text(json.dumps(host))
-            with self.assertRaisesRegex(ValueError, 'invalid provided value'):
+            with self.assertRaisesRegex(ValueError, 'invalid lookup declaration'):
+                expand(root)
+            host['lookups']['login-shell-host@1']['path_for'] = {}
+            host_file.write_text(json.dumps(host))
+            with self.assertRaisesRegex(ValueError, 'unsupported static lookup'):
                 expand(root)
             host_file.write_text((ROOT / 'modules/opensuse-tumbleweed/module.json').read_text())
             instance_file = root / 'instances/interactive.json'

@@ -1,13 +1,18 @@
 {
   "id": "login-shell-host@1",
-  "description": "A substrate that can provide Zsh as a login shell.",
-  "values": {
-    "zsh_path": {"type": "absolute-path", "guarantee": "The declared location of the Zsh executable on this substrate."}
+  "description": "A substrate that provisions supported login shells without exposing its package manager or shell registry.",
+  "values": {},
+  "lookups": {
+    "path_for": {
+      "args": {"shell_id": "string"},
+      "returns": "absolute-path",
+      "guarantee": "Pure declaration of the executable path for a supported shell; unsupported shells fail at expansion."
+    }
   },
   "transitions": {
-    "ensure_zsh": {
-      "args": {"path": "absolute-path"},
-      "guarantee": "Zsh is installed at the declared path, executable and accepted as a login shell."
+    "ensure": {
+      "args": {"shell_id": "string", "path": "absolute-path"},
+      "guarantee": "For a supported shell, the path must equal path_for(shell_id); ensure installs it and verifies it can be used as a login shell."
     }
   }
 }

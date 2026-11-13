@@ -5,12 +5,13 @@
   "requires": [],
   "values": {
     "os@1": {},
-    "login-shell-host@1": {"zsh_path": "/usr/bin/zsh"},
+    "login-shell-host@1": {},
     "local-account-host@1": {}
   },
+  "lookups": {"login-shell-host@1": {"path_for": {"zsh": "/usr/bin/zsh"}}},
   "transitions": {
     "os@1": {"ensure": "ensure-os.sh"},
-    "login-shell-host@1": {"ensure_zsh": "ensure-zsh.sh"},
+    "login-shell-host@1": {"ensure": "ensure-shell.sh"},
     "local-account-host@1": {"ensure_account": "ensure-account.sh"}
   }
 }

@@ -38,8 +38,8 @@ def load(root):
         name, version = identifier.rsplit("@", 1)
         if file.name != f"{name}.v{version}.json" or identifier in interfaces:
             raise ValueError(f"invalid or duplicate interface: {file}")
-        values, transitions = contract.get("values"), contract.get("transitions")
-        if not isinstance(values, dict) or not isinstance(transitions, dict) or not transitions:
+        values, transitions, lookups = contract.get("values"), contract.get("transitions"), contract.get("lookups", {})
+        if not isinstance(values, dict) or not isinstance(transitions, dict) or not transitions or not isinstance(lookups, dict):
             raise ValueError(f"invalid interface contract: {identifier}")
         for key, spec in values.items():
             if (not isinstance(key, str) or not ARG.fullmatch(key) or not isinstance(spec, dict)
@@ -49,6 +49,11 @@ def load(root):
             if (not isinstance(key, str) or not ARG.fullmatch(key) or not isinstance(spec, dict)
                     or not valid_signature(spec.get("args")) or not spec.get("guarantee")):
                 raise ValueError(f"invalid interface transition: {identifier}.{key}")
+        for key, spec in lookups.items():
+            if (not isinstance(key, str) or not ARG.fullmatch(key) or not isinstance(spec, dict)
+                    or spec.get("returns") not in TYPES or not spec.get("guarantee")
+                    or not valid_signature(spec.get("args")) or list(spec["args"].values()) != ["string"]):
+                raise ValueError(f"invalid interface lookup: {identifier}.{key}")
         interfaces[identifier] = contract
 
     modules = {}
@@ -75,20 +80,43 @@ def load(root):
         values, transitions = module.get("values"), module.get("transitions")
         if not isinstance(values, dict) or set(values) != set(provided) or not isinstance(transitions, dict) or set(transitions) != set(provided):
             raise ValueError(f"incomplete provided interface: {identifier}")
+        lookups = module.get("lookups", {})
+        if not isinstance(lookups, dict) or set(lookups) != {i for i in provided if interfaces[i].get("lookups")}:
+            raise ValueError(f"incomplete provided lookups: {identifier}")
+        for interface, methods in lookups.items():
+            if not isinstance(methods, dict) or set(methods) != set(interfaces[interface]["lookups"]):
+                raise ValueError(f"incomplete lookup methods: {identifier}.{interface}")
+            for method, mapping in methods.items():
+                spec = interfaces[interface]["lookups"][method]
+                if (not isinstance(mapping, dict) or any(not valid_value(k, "string")
+                        or not valid_value(v, spec["returns"]) for k, v in mapping.items())):
+                    raise ValueError(f"invalid lookup declaration: {identifier}.{method}")
+        constants = module.get("constants", {})
+        if (not isinstance(constants, dict) or any(not isinstance(k, str) or not ARG.fullmatch(k)
+                or not valid_value(v, "string") for k, v in constants.items())):
+            raise ValueError(f"invalid module constants: {identifier}")
         uses = module.get("uses", [])
         if not isinstance(uses, list):
             raise ValueError(f"invalid static uses: {identifier}")
         dynamic = {i: set() for i in provided}
         for use in uses:
-            if (not isinstance(use, dict) or set(use) != {"interface", "value", "as"}
-                    or use["interface"] not in required
-                    or use["value"] not in interfaces[use["interface"]]["values"]
-                    or not isinstance(use["as"], str) or not ARG.fullmatch(use["as"])):
+            if (not isinstance(use, dict) or use.get("interface") not in required
+                    or not isinstance(use.get("as"), str) or not ARG.fullmatch(use["as"])):
                 raise ValueError(f"invalid static use: {identifier}")
-            # A use supplies a provided value if names and types match; otherwise it supplies an argument.
+            source = interfaces[use["interface"]]
+            if set(use) == {"interface", "value", "as"} and use["value"] in source["values"]:
+                kind = source["values"][use["value"]]["type"]
+            elif set(use) == {"interface", "lookup", "args", "as"} and use["lookup"] in source.get("lookups", {}):
+                signature = source["lookups"][use["lookup"]]["args"]
+                if (not isinstance(use["args"], dict) or set(use["args"]) != set(signature)
+                        or any(ref not in constants and ref not in module.get("config", {}) for ref in use["args"].values())):
+                    raise ValueError(f"invalid lookup arguments: {identifier}")
+                kind = source["lookups"][use["lookup"]]["returns"]
+            else:
+                raise ValueError(f"unknown static value or lookup: {identifier}")
             for interface in provided:
                 if use["as"] in interfaces[interface]["values"]:
-                    if interfaces[interface]["values"][use["as"]]["type"] != interfaces[use["interface"]]["values"][use["value"]]["type"]:
+                    if interfaces[interface]["values"][use["as"]]["type"] != kind:
                         raise ValueError(f"incompatible static value: {identifier}.{use['as']}")
                     dynamic[interface].add(use["as"])
         for interface in provided:
@@ -104,7 +132,8 @@ def load(root):
             for name, script in transitions[interface].items():
                 if script is not None and (not isinstance(script, str) or not SCRIPT.fullmatch(script) or not (file.parent / script).is_file()):
                     raise ValueError(f"missing transition script: {identifier}.{name}")
-        if not valid_signature(module.get("config", {})) or not isinstance(module.get("calls", []), list):
+        if (not valid_signature(module.get("config", {})) or set(module.get("config", {})) & set(constants)
+                or not isinstance(module.get("calls", []), list)):
             raise ValueError(f"invalid config or calls: {identifier}")
         own_script = transitions[entry["interface"]][entry["transition"]]
         if (own_script is None) == (not module.get("calls", [])):
@@ -162,16 +191,31 @@ def expand(root=ROOT):
         module = modules[instance["module"]]
         bindings = instance.get("bindings", {})
         values = {interface: dict(v) for interface, v in module["values"].items()}
-        args = {key: {"value": value, "source": "config"} for key, value in instance.get("inputs", {}).items()}
+        args = {key: {"value": value, "source": "module"} for key, value in module.get("constants", {}).items()}
+        args.update({key: {"value": value, "source": "config"} for key, value in instance.get("inputs", {}).items()})
+        value_sources = {i: {key: "module" for key in v} for i, v in values.items()}
         for use in module.get("uses", []):
-            interface, key, dest = use["interface"], use["value"], use["as"]
+            interface, dest = use["interface"], use["as"]
             provider_id = bindings[interface]
-            source_value = expanded[provider_id]["provided"][interface][key]
-            source = {"interface": interface, "instance": provider_id, "value": key}
+            if "lookup" in use:
+                method = use["lookup"]
+                parameter = next(iter(interfaces[interface]["lookups"][method]["args"]))
+                source_name = use["args"][parameter]
+                lookup_key = args[source_name]["value"]
+                mapping = modules[instances[provider_id]["module"]]["lookups"][interface][method]
+                if lookup_key not in mapping:
+                    raise ValueError(f"unsupported static lookup: {identifier} -> {interface}.{method}({lookup_key})")
+                source_value = mapping[lookup_key]
+                source = {"interface": interface, "instance": provider_id, "lookup": method, "argument": lookup_key}
+            else:
+                key = use["value"]
+                source_value = expanded[provider_id]["provided"][interface][key]
+                source = {"interface": interface, "instance": provider_id, "value": key}
             destinations = [i for i in module["implements"] if dest in interfaces[i]["values"]]
             if destinations:
                 for provided in destinations:
                     values[provided][dest] = source_value
+                    value_sources[provided][dest] = source
             else:
                 if dest in args:
                     raise ValueError(f"duplicate argument: {identifier}.{dest}")
@@ -206,8 +250,8 @@ def expand(root=ROOT):
             actions.append({"provider": provider_id, "interface": interface, "transition": transition,
                             "module": provider["id"], "script": script, "args": passed})
         expanded[identifier] = {"id": identifier, "module": module["id"], "interface": entry["interface"],
-                                "dependencies": list(bindings.values()), "provided": values, "args": args,
-                                "actions": actions}
+                                "dependencies": list(bindings.values()), "provided": values, "value_sources": value_sources,
+                                "args": args, "actions": actions}
     return [expanded[identifier] for identifier in ordered]
 
 

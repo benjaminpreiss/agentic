@@ -3,8 +3,9 @@
   "implements": ["login-shell@1"],
   "entrypoint": {"interface": "login-shell@1", "transition": "ensure"},
   "requires": ["login-shell-host@1"],
+  "constants": {"shell_id": "zsh"},
   "values": {"login-shell@1": {}},
-  "uses": [{"interface": "login-shell-host@1", "value": "zsh_path", "as": "path"}],
+  "uses": [{"interface": "login-shell-host@1", "lookup": "path_for", "args": {"shell_id": "shell_id"}, "as": "path"}],
   "transitions": {"login-shell@1": {"ensure": null}},
-  "calls": [{"interface": "login-shell-host@1", "transition": "ensure_zsh", "args": {"path": "path"}}]
+  "calls": [{"interface": "login-shell-host@1", "transition": "ensure", "args": {"shell_id": "shell_id", "path": "path"}}]
 }

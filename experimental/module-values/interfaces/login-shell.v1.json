@@ -10,7 +10,7 @@
   "transitions": {
     "ensure": {
       "args": {},
-      "guarantee": "The declared path exists, is executable, and is listed in the target's login-shell registry."
+      "guarantee": "The declared executable path is usable as a login shell on the target."
     }
   }
 }
