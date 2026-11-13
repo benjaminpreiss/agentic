@@ -1,0 +1,12 @@
+{
+  "id": "opensuse-tumbleweed",
+  "instance": "host",
+  "implements": "os-base@1",
+  "entrypoint": "ensure",
+  "requires": [],
+  "provides": {
+    "os-base@1": {
+      "ensure": {"args": {}, "outputs": {}, "script": "ensure.yml"}
+    }
+  }
+}

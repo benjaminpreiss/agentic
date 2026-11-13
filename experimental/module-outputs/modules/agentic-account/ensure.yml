@@ -1,0 +1,36 @@
+---
+# shell_path is an injected input from a bound login-shell instance.
+- name: Inspect any pre-existing agentic account
+  ansible.builtin.getent:
+    database: passwd
+    key: agentic
+    fail_key: false
+
+- name: Refuse silent migration of an existing account to a different shell
+  ansible.builtin.assert:
+    that: (ansible_facts.getent_passwd | default({})).get('agentic') is none or ansible_facts.getent_passwd['agentic'][5] == shell_path
+    fail_msg: 'Existing account uses another shell; an explicit migration is required.'
+
+- name: Create account with the supplied verified login shell
+  ansible.builtin.user:
+    name: agentic
+    shell: '{{ shell_path }}'
+    create_home: true
+    # Do not rewrite supplementary groups of an existing account.
+
+- name: Check the account's configured shell
+  ansible.builtin.getent:
+    database: passwd
+    key: agentic
+
+- name: Check the account was not granted administrator groups
+  ansible.builtin.command: id -nG agentic
+  register: agentic_groups
+  changed_when: false
+
+- name: Verify resulting account state
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.getent_passwd['agentic'][5] == shell_path
+      - "'wheel' not in agentic_groups.stdout.split()"
+      - "'sudo' not in agentic_groups.stdout.split()"

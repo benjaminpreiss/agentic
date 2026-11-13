@@ -1,0 +1,16 @@
+{
+  "id": "zsh",
+  "instance": "interactive",
+  "implements": "login-shell@1",
+  "entrypoint": "ensure",
+  "requires": [
+    {"interface": "os-base@1", "instance": "host", "methods": {
+      "ensure": {"args": {}, "outputs": {}}
+    }}
+  ],
+  "provides": {
+    "login-shell@1": {
+      "ensure": {"args": {}, "outputs": {"path": "string"}, "script": "ensure.yml"}
+    }
+  }
+}
