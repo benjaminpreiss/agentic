@@ -1,0 +1,78 @@
+---
+# timer@1.ensure(id, command, schedule): root-owned, system-wide timer.
+- name: Validate timer request
+  ansible.builtin.assert:
+    that:
+      - timer_id is match('^[a-z][a-z0-9-]*$')
+      - timer_command is match('^/[A-Za-z0-9_./-]+$')
+      - timer_schedule | length > 0
+      - timer_schedule is not search('[\\r\\n]')
+    fail_msg: 'Invalid timer request; absolute executable path and safe unit ID required.'
+
+- name: Check command is installed
+  ansible.builtin.stat:
+    path: '{{ timer_command }}'
+  register: timer_executable
+
+- name: Require installed executable
+  ansible.builtin.assert:
+    that:
+      - timer_executable.stat.exists
+      - timer_executable.stat.isreg
+
+- name: Inspect existing timer unit
+  ansible.builtin.stat:
+    path: '/etc/systemd/system/{{ timer_id }}.timer'
+  register: prior_timer
+
+- name: Read existing timer unit
+  ansible.builtin.slurp:
+    src: '/etc/systemd/system/{{ timer_id }}.timer'
+  when: prior_timer.stat.exists
+  register: timer_unit_content
+
+- name: Refuse to replace a timer owned by someone else
+  ansible.builtin.assert:
+    that: "'# Managed by agentic systemd-timer@1' in (timer_unit_content.content | b64decode)"
+  when: prior_timer.stat.exists
+
+- name: Inspect existing service unit
+  ansible.builtin.stat:
+    path: '/etc/systemd/system/{{ timer_id }}.service'
+  register: prior_service
+
+- name: Read existing service unit
+  ansible.builtin.slurp:
+    src: '/etc/systemd/system/{{ timer_id }}.service'
+  when: prior_service.stat.exists
+  register: service_unit_content
+
+- name: Refuse to replace a service owned by someone else
+  ansible.builtin.assert:
+    that: "'# Managed by agentic systemd-timer@1' in (service_unit_content.content | b64decode)"
+  when: prior_service.stat.exists
+
+- name: Install managed service unit
+  ansible.builtin.template:
+    src: timer.service.j2
+    dest: '/etc/systemd/system/{{ timer_id }}.service'
+    owner: root
+    group: root
+    mode: '0644'
+  register: installed_service
+
+- name: Install managed timer unit
+  ansible.builtin.template:
+    src: timer.timer.j2
+    dest: '/etc/systemd/system/{{ timer_id }}.timer'
+    owner: root
+    group: root
+    mode: '0644'
+  register: installed_timer
+
+- name: Enable and start managed timer
+  ansible.builtin.systemd_service:
+    name: '{{ timer_id }}.timer'
+    enabled: true
+    state: started
+    daemon_reload: '{{ installed_service.changed or installed_timer.changed }}'

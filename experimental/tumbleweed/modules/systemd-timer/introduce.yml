@@ -1,0 +1,6 @@
+---
+- name: Verify systemd is the active service manager
+  ansible.builtin.command: systemctl is-system-running
+  register: systemd_state
+  changed_when: false
+  failed_when: systemd_state.rc not in [0, 1]  # degraded host is still systemd

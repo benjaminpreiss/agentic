@@ -7,7 +7,7 @@ This is an **incomplete, non-deployable Agentic prototype** to explore independe
 - Start from a **fresh, disposable x86_64 openSUSE Tumbleweed VM** installed using an official image with working console recovery. Never convert the existing Agentic host or use the NixOS disk-erasing installer against this VM.
 - Tumbleweed is the base substrate; Nix (eventually) supplies pinned Agentic software, not OS configuration. The existing NixOS modules **cannot** be used as-is on Tumbleweed.
 - Each `modules/<id>/` contains `module.json` (the declaration) and `introduce.yml` (Ansible transition tasks). The hardware module also owns `measure.sh`. The OS prerequisite, read-only measurement and **partial** base-access introduction can currently run as a chain. The backup module has a concrete, untested introduction script but depends on Agentic harness setup, which is blocked. Other modules' scripts explicitly fail closed rather than claim successful installation. These mark missing transitions, not implemented modules.
-- `plan.py` orders declarations and rejects missing dependencies, missing scripts and cycles. It emits an Ansible playbook with static task imports. It does **not** determine live state, manage instances/secrets, apply migrations, or infer success from a generated plan.
+- `plan.py` orders declarations and rejects missing dependencies, missing scripts and cycles. It binds versioned interfaces to providers, checks method signatures, and emits an Ansible playbook. It does **not** determine live state, manage instances/secrets, apply migrations, or infer success from a generated plan.
 - `modules/hardware-inventory/measure.sh` is a **read-only** hardware/boot/service inventory on the Tumbleweed VM. Save its output privately, e.g. `bash modules/hardware-inventory/measure.sh > private-hardware-report.txt` outside Git. Ansible suppresses its output to avoid leaking machine details to logs. It does not establish which drivers can be removed.
 
 From the repository root, run `python3 experimental/tumbleweed/plan.py` and `python3 -m unittest discover -s experimental/tumbleweed -p 'test_*.py'`.
@@ -23,6 +23,14 @@ ansible-playbook -i /private/path/to/inventory.ini introduction.generated.yml \
 
 Confirm both assertions in reality before setting them; do not use them to bypass recovery checks. The playbook uses privilege escalation and changes packages on the target. `introduction.generated.yml` must stay local (Git-ignored), since an inventory or Ansible output can contain private target details. Running `python3 plan.py --playbook > introduction.generated.yml` plans **all** modules, but currently stops deliberately at Nix bootstrap. Ansible is not installed in this development environment, so no syntax check or VM run has been completed.
 
+## Interfaces: modules as small objects, not Ansible roles as API
+
+`interfaces/timer.v1.json` defines `ensure(id, command, schedule)` and `remove(id)`. `modules/systemd-timer/` provides those operations using systemd units. `bindings.json` explicitly chooses `systemd-timer` for `timer@1`. `home-backup/module.json` requires `timer@1` and calls `ensure`; its introduction script only installs the archive program. The planner validates the call and emits an Ansible `include_tasks` **after** the backup executable is installed. No systemd syntax or file paths for timer units remain in the backup module. A different provider can satisfy the interface if it implements the same signature; live state migration between providers is *not* implemented.
+
+`timer@1` is intentionally narrow: a **root-owned, system-wide, calendar-triggered one-shot command**. It is not a general runner for arbitrary Ansible tasks or a universal scheduler. The provider refuses to overwrite a pre-existing unmanaged timer/service ID. The inverse `remove` operation refuses to delete unmanaged units, but module removal orchestration has not been implemented; do not invoke it as a general cleanup script. Contract checks only prove argument *shape*, not semantic equivalence or safe scheduling.
+
+This does **not require abandoning Ansible**. Ansible executes the provider's private tasks; the planner owns dependency binding and interface validation. Replacing Ansible would only become necessary if its task execution model prevents essential transitions or verification on a real VM. Ansible and the generated playbook have not been run on Tumbleweed yet.
+
 ## Scope mapped from the current deployment
 
 | Proposed module | Existing source | Status / missing introduction |
@@ -35,7 +43,8 @@ Confirm both assertions in reality before setting them; do not use them to bypas
 | sandbox | `nixos/modules/agentic.nix`, `nixos/profiles/` | Profiles, sockets and Herdr/nono boundary need porting and verification |
 | skills | `skills/enabled/`, `nixos/modules/agentic.nix` | Versioned links and ownership checks need implementation |
 | github-integration | `nixos/modules/github-mcp.nix`, `scripts/runtime/`, `github-protection/` | App key outside sandbox, MCP, credential broker, Git helper, audit timer need implementation; never place PEM in Nix store |
-| home-backup | `nixos/modules/agentic.nix` | Local timer/retention introduction scripted but untested; restore test and off-host backup still required |
+| systemd-timer | Tumbleweed systemd | Implements `timer@1` behind private systemd templates; untested on VM |
+| home-backup | `nixos/modules/agentic.nix` | Uses `timer@1` to schedule its local archive; untested, restore test and off-host backup still required |
 | firstboot-diagnostics | `nixos/modules/firstboot.nix` | SSH/network verification and console check need implementation |
 
 ## Why the reduction step is blocked

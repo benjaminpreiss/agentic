@@ -1,0 +1,8 @@
+{
+  "id": "timer",
+  "version": 1,
+  "operations": {
+    "ensure": {"args": {"id": "string", "command": "string", "schedule": "string"}},
+    "remove": {"args": {"id": "string"}}
+  }
+}
