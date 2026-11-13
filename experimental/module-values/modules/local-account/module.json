@@ -1,0 +1,11 @@
+{
+  "id": "local-account",
+  "implements": ["account@1"],
+  "entrypoint": {"interface": "account@1", "transition": "ensure"},
+  "requires": ["login-shell@1", "local-account-host@1"],
+  "values": {"account@1": {}},
+  "config": {"account_name": "string"},
+  "uses": [{"interface": "login-shell@1", "value": "path", "as": "shell_path"}],
+  "transitions": {"account@1": {"ensure": null}},
+  "calls": [{"interface": "local-account-host@1", "transition": "ensure_account", "args": {"account_name": "account_name", "shell_path": "shell_path"}}]
+}

@@ -1,50 +1,40 @@
-# Experiment: static values and effectful deployment transitions
+# Experiment: bound substrate methods (no Ansible)
 
-**Independent draft experiment**, not an Agentic installer and not a replacement for the NixOS deployment or Tumbleweed prototype in PRs #36/#38. Use only on a freshly installed, disposable openSUSE Tumbleweed VM with tested out-of-band console access. The generated Ansible playbook installs Zsh and may create the `agentic` account. It does not configure networking, SSH, a sandbox or agent harnesses.
+**Independent draft**, not an Agentic installer or a replacement for the supported NixOS deployment. Use only on a freshly installed **disposable Tumbleweed VM**, with out-of-band console access. This experiment installs Zsh and may create an unprivileged account. It does not set up networking, SSH, passwords, sandboxes or agent harnesses.
 
-## Two different phases
+## Model
 
-1. **Template expansion (pure, before contacting a target):** `python3 plan.py --expand` loads versioned interfaces, module implementations and instance configurations. It resolves `interactive.path` from the Zsh module declaration to `/usr/bin/zsh` and substitutes it into the `agentic` account instance. The expanded JSON retains where the value came from; it contains **no** Ansible commands or runtime observations.
-2. **Deployment execution (effectful, on a target):** `python3 plan.py --playbook` renders the expanded data into Ansible tasks. `zsh.ensure` installs Zsh and verifies that the **declared** path exists, is executable and is registered in `/etc/shells`. `account.ensure` configures and verifies the account with that same path. It refuses to silently change an existing account to a different shell. The plan cannot claim those checks passed before execution.
+- `os@1` is a general OS identity and preparation interface. The `opensuse-tumbleweed` module implements it; `host` is an **instance** of that module.
+- The *same host instance* also provides `login-shell-host@1` and `local-account-host@1`. These narrow interfaces promise Zsh provisioning with a static path and local account provisioning. The Tumbleweed implementation owns the `zypper`, `/etc/shells`, NSS, and `useradd` details. Other substrates can implement the same interfaces with different scripts and path declarations, or decline to implement them; no distro-name constraint is needed.
+- The generic `zsh` module implements `login-shell@1`. It gets its pure `path` value from the bound `login-shell-host@1.zsh_path` and delegates `ensure` to that host's `ensure_zsh(path)` transition.
+- The generic `local-account` module implements `account@1`. Its instance provides `account_name`, binds to a `login-shell@1` instance for the path and calls the bound `local-account-host@1.ensure_account(name, path)` transition.
 
-These are separate kinds of interface surface: `login-shell@1.values.path` is a deterministic, typed *static value*; `login-shell@1.transitions.ensure` is an effectful transition. There is no `command -v zsh` discovery or Ansible result substitution. If `/usr/bin/zsh` is wrong on a target, deployment fails its check rather than quietly changing the account declaration. A different Zsh layout requires a different provider declaration/version or an explicitly parameterised instance.
+`plan.py --expand` is **pure**: it resolves the path `/usr/bin/zsh` and the provider method calls, type-checks values and bindings, and orders host, Zsh, account. It does not contact the target. `plan.py --script` embeds the **bound host implementation's** scripts into a standalone shell script; the planner contains no OS-specific package or account logic, and Ansible is not used. This is a tiny executor, not a general-purpose configuration engine. Runtime checks establish whether the static declaration actually holds; they never supply the declaration's path.
 
-```text
-interfaces/os.v1.json                   generic OS contract with static distro value
-interfaces/login-shell.v1.json          portable shell contract and static path type
-modules/opensuse-tumbleweed/            implements os@1; declares distro=opensuse-tumbleweed
-modules/zsh-on-tumbleweed/              requires os@1 with distro=opensuse-tumbleweed
-modules/tumbleweed-local-account/       requires os@1 with distro=opensuse-tumbleweed
-instances/host.json                     selects opensuse-tumbleweed implementation
-instances/interactive.json              binds os@1 to host; provides login-shell@1
-instances/agentic.json                  name=agentic; binds login-shell@1 to interactive
-```
+## Inspect without a target
 
-**Modules** map transitions to scripts, declare static values, required interfaces and where static values are used. Both the Zsh and reusable account implementations require `os@1`, and constrain its bound instance's static `distro` value to `opensuse-tumbleweed`. The `host` instance selects the concrete `opensuse-tumbleweed` module implementing `os@1`; the interface is **not** named after that implementation. This compatibility check is not a universal claim that `os@1` guarantees `zypper`, `/etc/shells`, or `getent`: these Tumbleweed-specific transitions check their assumptions on the target. We avoid a shallow package-manager wrapper around Ansible's existing package abstraction. A second OS implementation can show which narrower capabilities are actually shared. **Instances** have stable identity, literal configuration and provider-instance bindings. The account module contains neither `agentic` nor `/bin/zsh`. A second account instance can reuse the same account module and shell provider; `test_plan.py` exercises this case. These interface files live in this experiment, **not in the framework**; independent publication is still an open packaging question.
-
-## Trying it
-
-From the repository root, run:
+From the repository root:
 
 ```bash
-python3 experimental/module-values/plan.py --expand
 python3 -m unittest discover -s experimental/module-values -p 'test_*.py'
+python3 experimental/module-values/plan.py --expand
+cd experimental/module-values
+python3 plan.py --script > introduction.generated.sh
+sh -n introduction.generated.sh
 ```
 
-To run **only on a disposable VM** with a verified console:
+## Running on a disposable VM (NOT YET VALIDATED)
+
+Review the generated script, take a VM snapshot and confirm out-of-band console access. **Do not run this on the development host.** From `experimental/module-values`, using an SSH account with `sudo` on the disposable VM:
 
 ```bash
-cd experimental/module-values
-python3 plan.py --playbook > introduction.generated.yml
-ansible-playbook -i /private/path/to/inventory.ini introduction.generated.yml \
-  -e agentic_disposable_vm=true -e agentic_console_verified=true
+ssh -T -i /private/path/to/key vm-user@disposable-vm \
+  'sudo env AGENTIC_DISPOSABLE_VM=true AGENTIC_CONSOLE_VERIFIED=true sh -s' \
+  < introduction.generated.sh
 ```
 
-Only set those confirmations after checking the target. `introduction.generated.yml` and local inventory are ignored by Git. Run it again and check `getent passwd agentic`; an unchanged account is the expected postcondition. Ansible is not installed in this development environment, so the playbook has **not** passed Ansible syntax validation or a Tumbleweed VM run yet.
+The flags confirm *your* verification of disposability and console access; the script cannot prove either. Its first action checks OS identity before installing Zsh or creating the account. Rerunning should preserve an existing matching account; an existing different shell requires an explicit migration. The shell transport itself is not implemented by the planner. No VM execution or distribution-specific package verification has occurred.
 
-## Not established
+## Limits
 
-- Static values can change when module versions or configuration change; replacing a provider or changing a live account's name needs an explicit migration. This prototype has no prior-state record and **must not** be used for either change.
-- The planner type-checks static values but cannot prove the interfaces' written guarantees. Target-side checks and a real VM rerun are required.
-- Runtime observations, drift, interrupted transitions, removal, secrets and password management are out of scope. Do not put secrets in instance JSON or generated playbooks.
-- Ansible remains one possible deployment executor. This experiment does not justify building a custom one yet.
+The interfaces' written guarantees still need real target-side testing, especially `/usr/bin/zsh` registration in `/etc/shells` on Tumbleweed. The planner validates the shape of provider methods but cannot prove shell scripts fulfill their guarantees. Generated scripts and inventory/SSH credentials must not be committed. Provider changes, drift, interruption, password management and account migrations are out of scope. No unsupported NixOS behaviour has changed.

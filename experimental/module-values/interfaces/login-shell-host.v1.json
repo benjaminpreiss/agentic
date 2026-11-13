@@ -1,0 +1,13 @@
+{
+  "id": "login-shell-host@1",
+  "description": "A substrate that can provide Zsh as a login shell.",
+  "values": {
+    "zsh_path": {"type": "absolute-path", "guarantee": "The declared location of the Zsh executable on this substrate."}
+  },
+  "transitions": {
+    "ensure_zsh": {
+      "args": {"path": "absolute-path"},
+      "guarantee": "Zsh is installed at the declared path, executable and accepted as a login shell."
+    }
+  }
+}

@@ -1,8 +1,16 @@
 {
   "id": "opensuse-tumbleweed",
-  "implements": "os@1",
-  "entrypoint": "ensure",
+  "implements": ["os@1", "login-shell-host@1", "local-account-host@1"],
+  "entrypoint": {"interface": "os@1", "transition": "ensure"},
   "requires": [],
-  "values": {"distro": "opensuse-tumbleweed"},
-  "transitions": {"ensure": "ensure.yml"}
+  "values": {
+    "os@1": {},
+    "login-shell-host@1": {"zsh_path": "/usr/bin/zsh"},
+    "local-account-host@1": {}
+  },
+  "transitions": {
+    "os@1": {"ensure": "ensure-os.sh"},
+    "login-shell-host@1": {"ensure_zsh": "ensure-zsh.sh"},
+    "local-account-host@1": {"ensure_account": "ensure-account.sh"}
+  }
 }
