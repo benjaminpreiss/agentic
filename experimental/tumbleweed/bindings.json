@@ -1,0 +1,13 @@
+{
+  "os-base@1": "opensuse-tumbleweed",
+  "hardware-inventory@1": "hardware-inventory",
+  "base-access@1": "base-access",
+  "nix-packages@1": "nix-packages",
+  "agent-harnesses@1": "agent-harnesses",
+  "sandbox@1": "sandbox",
+  "skills@1": "skills",
+  "github-integration@1": "github-integration",
+  "home-backup@1": "home-backup",
+  "firstboot-diagnostics@1": "firstboot-diagnostics",
+  "timer@1": "systemd-timer"
+}

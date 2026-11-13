@@ -1,0 +1,11 @@
+# Managed by agentic systemd-timer@1
+[Unit]
+Description=Agentic timer {{ timer_id }}
+
+[Timer]
+OnCalendar={{ timer_schedule }}
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

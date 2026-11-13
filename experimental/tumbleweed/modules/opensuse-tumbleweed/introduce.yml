@@ -1,0 +1,15 @@
+---
+# The base OS is provided by a freshly installed VM, not by Ansible itself.
+- name: Verify the fresh substrate is openSUSE Tumbleweed
+  ansible.builtin.command:
+    argv: [grep, -Eq, '^ID="?opensuse-tumbleweed"?$', /etc/os-release]
+  register: opensuse_release
+  changed_when: false
+  failed_when: opensuse_release.rc != 0
+
+- name: Require x86_64 target and explicitly confirmed disposable VM
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture == 'x86_64'
+      - agentic_disposable_vm | default(false) | bool
+    fail_msg: 'Use a fresh disposable x86_64 VM with out-of-band console; explicitly set agentic_disposable_vm=true.'

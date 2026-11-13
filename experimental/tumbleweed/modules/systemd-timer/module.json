@@ -1,0 +1,40 @@
+{
+  "id": "systemd-timer",
+  "version": "prototype-1",
+  "substrate": "os-base@1",
+  "status": "prototype: timer interface backed by systemd; untested on Tumbleweed VM",
+  "requires_interfaces": [
+    {
+      "interface": "os-base@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    }
+  ],
+  "implements": "timer@1",
+  "entrypoint": "prepare",
+  "provides": {
+    "timer@1": {
+      "prepare": {
+        "args": {},
+        "script": "introduce.yml"
+      },
+      "ensure": {
+        "args": {
+          "id": "string",
+          "command": "string",
+          "schedule": "string"
+        },
+        "script": "ensure.yml"
+      },
+      "remove": {
+        "args": {
+          "id": "string"
+        },
+        "script": "remove.yml"
+      }
+    }
+  }
+}

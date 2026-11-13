@@ -1,0 +1,34 @@
+{
+  "id": "nix-packages",
+  "version": "prototype-1",
+  "substrate": "os-base@1",
+  "status": "not implemented: Nix bootstrap and pinned flake inputs",
+  "requires_interfaces": [
+    {
+      "interface": "base-access@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    },
+    {
+      "interface": "os-base@1",
+      "operations": {
+        "ensure": {
+          "args": {}
+        }
+      }
+    }
+  ],
+  "implements": "nix-packages@1",
+  "entrypoint": "ensure",
+  "provides": {
+    "nix-packages@1": {
+      "ensure": {
+        "args": {},
+        "script": "introduce.yml"
+      }
+    }
+  }
+}
