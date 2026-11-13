@@ -1,1 +1,0 @@
-{"id":"base-access","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"not implemented: SSH, networking, firewall, AppArmor, fail2ban, recovery console","requires":["hardware-inventory"]}

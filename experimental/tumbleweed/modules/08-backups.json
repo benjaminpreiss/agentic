@@ -1,1 +1,0 @@
-{"id":"home-backup","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"not implemented: local archive timer/retention (not off-server backup)","requires":["agent-harnesses"]}

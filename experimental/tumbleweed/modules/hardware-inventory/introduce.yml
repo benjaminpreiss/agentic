@@ -1,0 +1,12 @@
+---
+# The measurement intentionally does not change any boot, firmware, or driver files.
+- name: Collect read-only hardware and boot inventory
+  ansible.builtin.script: measure.sh
+  register: hardware_inventory
+  changed_when: false
+  no_log: true  # stdout contains addresses and potentially identifying hardware data
+
+- name: Confirm inventory completed
+  ansible.builtin.assert:
+    that: hardware_inventory.rc == 0
+    fail_msg: 'Read-only measurement failed; do not attempt reduction.'

@@ -1,29 +1,41 @@
 # Draft: Agentic on openSUSE Tumbleweed (NOT an installer)
 
-This is an **incomplete, non-deployable prototype** to explore whether an Agentic installation can be described as independently authored modules with dependencies and scripts. The supported deployment remains [NixOS](../../docs/install.md). Do not run this on a production server. No disk installer, OS stripping, Nix bootstrap, or Agentic setup is implemented here.
+This is an **incomplete, non-deployable Agentic prototype** to explore independently authored modules, dependency ordering and Ansible introduction scripts. The supported deployment remains [NixOS](../../docs/install.md). Do not run this on a production server. There is no disk installer, driver removal, Nix bootstrap or full Agentic setup here.
 
 ## Experiment boundary
 
 - Start from a **fresh, disposable x86_64 openSUSE Tumbleweed VM** installed using an official image with working console recovery. Never convert the existing Agentic host or use the NixOS disk-erasing installer against this VM.
 - Tumbleweed is the base substrate; Nix (eventually) supplies pinned Agentic software, not OS configuration. The existing NixOS modules **cannot** be used as-is on Tumbleweed.
-- `modules/*.json` inventories the **full current Agentic scope** with explicit dependency edges and honest implementation statuses. `plan.py` orders them and rejects missing dependencies or cycles. It does **not** install or verify modules, resolve instances, manage secrets, or infer state from a successful plan.
-- `measure.sh` is a **read-only** hardware/boot/service inventory run on the Tumbleweed VM. Save its output privately, e.g. `bash measure.sh > private-hardware-report.txt` outside Git. It does not conclude which drivers are safe to remove.
+- Each `modules/<id>/` contains `module.json` (the declaration) and `introduce.yml` (Ansible transition tasks). The hardware module also owns `measure.sh`. The OS prerequisite, read-only measurement and **partial** base-access introduction can currently run as a chain. The backup module has a concrete, untested introduction script but depends on Agentic harness setup, which is blocked. Other modules' scripts explicitly fail closed rather than claim successful installation. These mark missing transitions, not implemented modules.
+- `plan.py` orders declarations and rejects missing dependencies, missing scripts and cycles. It emits an Ansible playbook with static task imports. It does **not** determine live state, manage instances/secrets, apply migrations, or infer success from a generated plan.
+- `modules/hardware-inventory/measure.sh` is a **read-only** hardware/boot/service inventory on the Tumbleweed VM. Save its output privately, e.g. `bash modules/hardware-inventory/measure.sh > private-hardware-report.txt` outside Git. Ansible suppresses its output to avoid leaking machine details to logs. It does not establish which drivers can be removed.
 
-Run locally: `python3 experimental/tumbleweed/plan.py` and `python3 -m unittest discover -s experimental/tumbleweed -p 'test_*.py'`.
+From the repository root, run `python3 experimental/tumbleweed/plan.py` and `python3 -m unittest discover -s experimental/tumbleweed -p 'test_*.py'`.
+
+To try **only the implemented partial chain** on a fresh VM, create a private Ansible inventory with an `agentic_vm` host and SSH access. Then:
+
+```bash
+cd experimental/tumbleweed
+python3 plan.py --until base-access > introduction.generated.yml
+ansible-playbook -i /private/path/to/inventory.ini introduction.generated.yml \
+  -e agentic_disposable_vm=true -e agentic_console_verified=true
+```
+
+Confirm both assertions in reality before setting them; do not use them to bypass recovery checks. The playbook uses privilege escalation and changes packages on the target. `introduction.generated.yml` must stay local (Git-ignored), since an inventory or Ansible output can contain private target details. Running `python3 plan.py --playbook > introduction.generated.yml` plans **all** modules, but currently stops deliberately at Nix bootstrap. Ansible is not installed in this development environment, so no syntax check or VM run has been completed.
 
 ## Scope mapped from the current deployment
 
 | Proposed module | Existing source | Status / missing introduction |
 |---|---|---|
-| opensuse-tumbleweed | `nixos/flake.nix`, `nixos/modules/disk.nix` | Fresh VM image is external; image pinning and disk/boot workflow not implemented |
-| hardware-inventory | `nixos/modules/base.nix` | Read-only report implemented; no driver/service reduction yet |
-| base-access | `nixos/modules/base.nix`, `recovery.nix` | SSH keys/network/firewall, AppArmor, fail2ban, recovery console need implementation |
+| opensuse-tumbleweed | `nixos/flake.nix`, `nixos/modules/disk.nix` | Verifies external fresh VM image; image pinning and disk/boot workflow not implemented |
+| hardware-inventory | `nixos/modules/base.nix` | Read-only measurement task implemented; no driver/service reduction yet |
+| base-access | `nixos/modules/base.nix`, `recovery.nix` | Basic tools installed after console confirmation; SSH keys/network/firewall, AppArmor, fail2ban and recovery configuration still pending |
 | nix-packages | `nixos/flake.nix` | Nix bootstrap and pinning Pi/OMP/nono/Herdr/tooling need implementation |
 | agent-harnesses | `nixos/modules/agentic.nix` | User, workspace, Zsh/Starship, terminfo, status screen and safe Pi/OMP launchers need implementation |
 | sandbox | `nixos/modules/agentic.nix`, `nixos/profiles/` | Profiles, sockets and Herdr/nono boundary need porting and verification |
 | skills | `skills/enabled/`, `nixos/modules/agentic.nix` | Versioned links and ownership checks need implementation |
 | github-integration | `nixos/modules/github-mcp.nix`, `scripts/runtime/`, `github-protection/` | App key outside sandbox, MCP, credential broker, Git helper, audit timer need implementation; never place PEM in Nix store |
-| home-backup | `nixos/modules/agentic.nix` | Local backup timer/retention need implementation; off-host backups still required |
+| home-backup | `nixos/modules/agentic.nix` | Local timer/retention introduction scripted but untested; restore test and off-host backup still required |
 | firstboot-diagnostics | `nixos/modules/firstboot.nix` | SSH/network verification and console check need implementation |
 
 ## Why the reduction step is blocked

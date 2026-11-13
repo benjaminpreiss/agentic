@@ -1,0 +1,1 @@
+{"id":"base-access","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"partial: installs basic tools after console verification; SSH/network/firewall/hardening still pending","requires":["hardware-inventory"]}
