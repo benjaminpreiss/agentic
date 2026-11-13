@@ -10,15 +10,17 @@
 These are separate kinds of interface surface: `login-shell@1.values.path` is a deterministic, typed *static value*; `login-shell@1.transitions.ensure` is an effectful transition. There is no `command -v zsh` discovery or Ansible result substitution. If `/usr/bin/zsh` is wrong on a target, deployment fails its check rather than quietly changing the account declaration. A different Zsh layout requires a different provider declaration/version or an explicitly parameterised instance.
 
 ```text
-interfaces/opensuse-tumbleweed.v1.json  explicit host contract for this OS
+interfaces/os.v1.json                   generic OS contract with static distro value
 interfaces/login-shell.v1.json          portable shell contract and static path type
-modules/zsh-on-tumbleweed/              implements login-shell@1; path=/usr/bin/zsh
-modules/tumbleweed-local-account/       implements account@1; uses login-shell@1.path
-instances/interactive.json             binds opensuse-tumbleweed@1 to host
-instances/agentic.json                 name=agentic; binds login-shell@1 to interactive
+modules/opensuse-tumbleweed/            implements os@1; declares distro=opensuse-tumbleweed
+modules/zsh-on-tumbleweed/              requires os@1 with distro=opensuse-tumbleweed
+modules/tumbleweed-local-account/       requires os@1 with distro=opensuse-tumbleweed
+instances/host.json                     selects opensuse-tumbleweed implementation
+instances/interactive.json              binds os@1 to host; provides login-shell@1
+instances/agentic.json                  name=agentic; binds login-shell@1 to interactive
 ```
 
-**Modules** map transitions to scripts, declare static values, required interfaces and where static values are used. Both the Zsh implementation and the reusable local-account implementation explicitly require `opensuse-tumbleweed@1`: installing `zsh`, reading `/etc/shells`, and using `getent` are not promises of an abstract Linux base. This avoids adding a shallow package-manager wrapper over Ansible's existing package abstraction. A second OS implementation can reveal which narrower cross-distribution contracts are genuinely shared. **Instances** have stable identity, literal configuration and provider-instance bindings. The account module contains neither `agentic` nor `/bin/zsh`. A second account instance can reuse the same account module and shell provider; `test_plan.py` exercises this case. These interface files live in this experiment, **not in the framework**; independent publication is still an open packaging question.
+**Modules** map transitions to scripts, declare static values, required interfaces and where static values are used. Both the Zsh and reusable account implementations require `os@1`, and constrain its bound instance's static `distro` value to `opensuse-tumbleweed`. The `host` instance selects the concrete `opensuse-tumbleweed` module implementing `os@1`; the interface is **not** named after that implementation. This compatibility check is not a universal claim that `os@1` guarantees `zypper`, `/etc/shells`, or `getent`: these Tumbleweed-specific transitions check their assumptions on the target. We avoid a shallow package-manager wrapper around Ansible's existing package abstraction. A second OS implementation can show which narrower capabilities are actually shared. **Instances** have stable identity, literal configuration and provider-instance bindings. The account module contains neither `agentic` nor `/bin/zsh`. A second account instance can reuse the same account module and shell provider; `test_plan.py` exercises this case. These interface files live in this experiment, **not in the framework**; independent publication is still an open packaging question.
 
 ## Trying it
 

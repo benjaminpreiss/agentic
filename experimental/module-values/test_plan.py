@@ -10,7 +10,8 @@ class ExpansionTests(unittest.TestCase):
     def test_static_shell_path_is_substituted_before_ansible(self):
         expanded = expand()
         self.assertEqual([instance['id'] for instance in expanded], ['host', 'interactive', 'agentic'])
-        self.assertEqual(expanded[0]['interface'], 'opensuse-tumbleweed@1')
+        self.assertEqual(expanded[0]['interface'], 'os@1')
+        self.assertEqual(expanded[0]['values']['distro'], 'opensuse-tumbleweed')
         account = expanded[-1]
         self.assertEqual(account['dependencies'], ['host', 'interactive'])
         self.assertEqual(account['args']['account_name'], {'value': 'agentic', 'source': 'config'})
@@ -33,7 +34,7 @@ class ExpansionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_experiment(Path(temporary))
             reviewer = {'id': 'reviewer', 'module': 'tumbleweed-local-account',
-                        'bindings': {'opensuse-tumbleweed@1': 'host', 'login-shell@1': 'interactive'},
+                        'bindings': {'os@1': 'host', 'login-shell@1': 'interactive'},
                         'inputs': {'account_name': 'reviewer'}}
             (root / 'instances/reviewer.json').write_text(json.dumps(reviewer))
             expanded = expand(root)
@@ -54,6 +55,10 @@ class ExpansionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'invalid provided value'):
                 expand(root)
             zsh = json.loads((ROOT / 'modules/zsh-on-tumbleweed/module.json').read_text())
+            zsh['constraints']['os@1']['distro'] = 'ubuntu'
+            zsh_file.write_text(json.dumps(zsh))
+            with self.assertRaisesRegex(ValueError, 'incompatible provider value'):
+                expand(root)
             zsh['requires'] = ['os-base@1']
             zsh_file.write_text(json.dumps(zsh))
             with self.assertRaisesRegex(ValueError, 'unknown or duplicate required interface'):

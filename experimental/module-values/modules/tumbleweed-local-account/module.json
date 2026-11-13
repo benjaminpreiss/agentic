@@ -2,7 +2,8 @@
   "id": "tumbleweed-local-account",
   "implements": "account@1",
   "entrypoint": "ensure",
-  "requires": ["opensuse-tumbleweed@1", "login-shell@1"],
+  "requires": ["os@1", "login-shell@1"],
+  "constraints": {"os@1": {"distro": "opensuse-tumbleweed"}},
   "config": {"account_name": "string"},
   "uses": [
     {"interface": "login-shell@1", "value": "path", "as": "shell_path"}

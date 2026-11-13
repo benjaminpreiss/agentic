@@ -1,0 +1,16 @@
+{
+  "id": "os@1",
+  "description": "An operating system substrate on the target host.",
+  "values": {
+    "distro": {
+      "type": "string",
+      "guarantee": "Declared distribution identity; the provider verifies it on the target."
+    }
+  },
+  "transitions": {
+    "ensure": {
+      "args": {},
+      "guarantee": "The declared OS identity and required recovery preconditions have been checked."
+    }
+  }
+}

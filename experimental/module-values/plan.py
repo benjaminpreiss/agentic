@@ -81,6 +81,15 @@ def expand(root=ROOT):
             raise ValueError(f"unknown or duplicate required interface: {identifier}")
         if not valid_signature(module.get("config", {})):
             raise ValueError(f"invalid config declaration: {identifier}")
+        constraints = module.get("constraints", {})
+        if not isinstance(constraints, dict) or not set(constraints).issubset(required):
+            raise ValueError(f"invalid required-interface constraints: {identifier}")
+        for required_interface, values in constraints.items():
+            if (not isinstance(values, dict) or not values
+                    or any(value_name not in interfaces[required_interface]["values"]
+                           or not valid_value(expected, interfaces[required_interface]["values"][value_name]["type"])
+                           for value_name, expected in values.items())):
+                raise ValueError(f"invalid required-interface constraint: {identifier} -> {required_interface}")
         if not isinstance(module.get("uses", []), list):
             raise ValueError(f"invalid static uses: {identifier}")
         modules[identifier] = module
@@ -105,8 +114,12 @@ def expand(root=ROOT):
         for interface, provider_id in bindings.items():
             if provider_id not in instances or provider_id == identifier:
                 raise ValueError(f"unknown or self provider: {identifier} -> {provider_id}")
-            if instances[provider_id]["_module"]["implements"] != interface:
+            provider = instances[provider_id]["_module"]
+            if provider["implements"] != interface:
                 raise ValueError(f"binding does not provide {interface}: {identifier} -> {provider_id}")
+            for name, expected in module.get("constraints", {}).get(interface, {}).items():
+                if provider["values"][name] != expected:
+                    raise ValueError(f"incompatible provider value: {identifier} needs {interface}.{name}={expected}")
             dependencies.append(provider_id)
         config = instance.get("inputs", {})
         if not isinstance(config, dict) or set(config) != set(module.get("config", {})):

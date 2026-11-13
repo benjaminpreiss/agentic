@@ -2,7 +2,7 @@
   "id": "interactive",
   "module": "zsh-on-tumbleweed",
   "bindings": {
-    "opensuse-tumbleweed@1": "host"
+    "os@1": "host"
   },
   "inputs": {}
 }

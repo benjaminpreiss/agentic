@@ -2,7 +2,8 @@
   "id": "zsh-on-tumbleweed",
   "implements": "login-shell@1",
   "entrypoint": "ensure",
-  "requires": ["opensuse-tumbleweed@1"],
+  "requires": ["os@1"],
+  "constraints": {"os@1": {"distro": "opensuse-tumbleweed"}},
   "values": {"path": "/usr/bin/zsh"},
   "transitions": {"ensure": "ensure.yml"}
 }

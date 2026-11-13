@@ -1,8 +1,8 @@
 {
   "id": "opensuse-tumbleweed",
-  "implements": "opensuse-tumbleweed@1",
+  "implements": "os@1",
   "entrypoint": "ensure",
   "requires": [],
-  "values": {},
+  "values": {"distro": "opensuse-tumbleweed"},
   "transitions": {"ensure": "ensure.yml"}
 }

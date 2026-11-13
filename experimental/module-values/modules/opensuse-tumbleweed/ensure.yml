@@ -1,4 +1,8 @@
 ---
+- name: Verify declared OS identity matches this implementation
+  ansible.builtin.assert:
+    that: provided_distro == 'opensuse-tumbleweed'
+
 - name: Verify fresh Tumbleweed substrate
   ansible.builtin.command:
     argv: [grep, -Eq, '^ID="?opensuse-tumbleweed"?$', /etc/os-release]
