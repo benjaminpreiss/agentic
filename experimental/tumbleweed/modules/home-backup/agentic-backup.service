@@ -1,0 +1,7 @@
+[Unit]
+Description=Create a local Agentic home archive
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/libexec/agentic-backup

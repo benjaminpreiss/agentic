@@ -1,0 +1,1 @@
+{"id":"nix-packages","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"not implemented: Nix bootstrap and pinned flake inputs","requires":["base-access"]}

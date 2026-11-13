@@ -1,0 +1,1 @@
+{"id":"firstboot-diagnostics","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"not implemented: network/SSH console checks and recovery verification","requires":["base-access"]}

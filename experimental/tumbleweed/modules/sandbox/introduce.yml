@@ -1,0 +1,4 @@
+---
+- name: Refuse to enable agents without verified nono and Herdr profiles
+  ansible.builtin.fail:
+    msg: 'BLOCKED: port the nono profiles, launchers and GitHub socket grants; confirm raw Pi/OMP binaries cannot bypass sandboxing.'

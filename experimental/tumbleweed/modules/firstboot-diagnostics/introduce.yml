@@ -1,0 +1,4 @@
+---
+- name: Refuse to claim boot and network verified by an Ansible run
+  ansible.builtin.fail:
+    msg: 'BLOCKED: verify reboot via console, new SSH host key, network route, SSH login and recovery account before marking first boot successful.'

@@ -1,0 +1,1 @@
+{"id":"agent-harnesses","version":"prototype-1","substrate":"nix-packages","status":"not implemented: agentic user/workspace, Zsh, Starship, Pi, OMP, Node, tooling, status screen","requires":["nix-packages"]}

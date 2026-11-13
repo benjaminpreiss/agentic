@@ -1,0 +1,45 @@
+---
+- name: Check that the agentic account exists before scheduling backups
+  ansible.builtin.command: id agentic
+  changed_when: false
+
+- name: Create local executable directory
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install local backup program
+  ansible.builtin.copy:
+    src: backup.sh
+    dest: /usr/local/libexec/agentic-backup
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Install local backup systemd service
+  ansible.builtin.copy:
+    src: agentic-backup.service
+    dest: /etc/systemd/system/agentic-backup.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: backup_service
+
+- name: Install local backup systemd timer
+  ansible.builtin.copy:
+    src: agentic-backup.timer
+    dest: /etc/systemd/system/agentic-backup.timer
+    owner: root
+    group: root
+    mode: '0644'
+  register: backup_timer
+
+- name: Enable the local archive timer (not an off-server backup)
+  ansible.builtin.systemd_service:
+    name: agentic-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: '{{ backup_service.changed or backup_timer.changed }}'
