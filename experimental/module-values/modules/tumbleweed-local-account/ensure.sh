@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+grep -Eq '^ID="?opensuse-tumbleweed"?$' /etc/os-release || { echo 'Not Tumbleweed' >&2; exit 1; }
 account_name=$1
 shell_path=$2
 case "$account_name" in

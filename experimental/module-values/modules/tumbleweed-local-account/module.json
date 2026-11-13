@@ -1,0 +1,11 @@
+{
+  "id": "tumbleweed-local-account",
+  "implements": "account@1",
+  "entrypoint": "ensure",
+  "requires": ["os@1", "login-shell@1"],
+  "config": {"account_name": "string"},
+  "uses": [{"interface": "login-shell@1", "lookup": "path", "args": {}, "as": "shell_path"}],
+  "lookups": {},
+  "transitions": {"ensure": "ensure.sh"},
+  "script_args": ["account_name", "shell_path"]
+}

@@ -1,8 +1,8 @@
 {
   "id": "agentic",
-  "module": "local-account",
+  "module": "tumbleweed-local-account",
   "bindings": {
-    "local-account-host@1": "host",
+    "os@1": "host",
     "login-shell@1": "interactive"
   },
   "inputs": {

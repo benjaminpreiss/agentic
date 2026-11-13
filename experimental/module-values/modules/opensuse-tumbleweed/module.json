@@ -1,16 +1,9 @@
 {
   "id": "opensuse-tumbleweed",
-  "implements": ["os@1", "login-shell-host@1", "local-account-host@1"],
-  "entrypoint": {"interface": "os@1", "transition": "ensure"},
+  "implements": "os@1",
+  "entrypoint": "ensure",
   "requires": [],
-  "values": {
-    "os@1": {},
-    "login-shell-host@1": {},
-    "local-account-host@1": {}
-  },
-  "transitions": {
-    "os@1": {"ensure": "ensure-os.sh"},
-    "login-shell-host@1": {"ensure": "ensure-shell.sh"},
-    "local-account-host@1": {"ensure_account": "ensure-account.sh"}
-  }
+  "lookups": {},
+  "transitions": {"ensure": "ensure-os.sh"},
+  "script_args": []
 }
