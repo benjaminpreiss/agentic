@@ -52,7 +52,7 @@ def load(root):
         for key, spec in lookups.items():
             if (not isinstance(key, str) or not ARG.fullmatch(key) or not isinstance(spec, dict)
                     or spec.get("returns") not in TYPES or not spec.get("guarantee")
-                    or not valid_signature(spec.get("args")) or list(spec["args"].values()) != ["string"]):
+                    or not valid_signature(spec.get("args")) or list(spec["args"].values()) not in ([], ["string"])):
                 raise ValueError(f"invalid interface lookup: {identifier}.{key}")
         interfaces[identifier] = contract
 
@@ -88,8 +88,12 @@ def load(root):
                 raise ValueError(f"incomplete lookup methods: {identifier}.{interface}")
             for method, mapping in methods.items():
                 spec = interfaces[interface]["lookups"][method]
-                if (not isinstance(mapping, dict) or any(not valid_value(k, "string")
-                        or not valid_value(v, spec["returns"]) for k, v in mapping.items())):
+                if not spec["args"]:
+                    valid = valid_value(mapping, spec["returns"])
+                else:
+                    valid = (isinstance(mapping, dict) and all(valid_value(k, "string")
+                             and valid_value(v, spec["returns"]) for k, v in mapping.items()))
+                if not valid:
                     raise ValueError(f"invalid lookup declaration: {identifier}.{method}")
         constants = module.get("constants", {})
         if (not isinstance(constants, dict) or any(not isinstance(k, str) or not ARG.fullmatch(k)
@@ -199,14 +203,19 @@ def expand(root=ROOT):
             provider_id = bindings[interface]
             if "lookup" in use:
                 method = use["lookup"]
-                parameter = next(iter(interfaces[interface]["lookups"][method]["args"]))
-                source_name = use["args"][parameter]
-                lookup_key = args[source_name]["value"]
+                signature = interfaces[interface]["lookups"][method]["args"]
                 mapping = modules[instances[provider_id]["module"]]["lookups"][interface][method]
-                if lookup_key not in mapping:
-                    raise ValueError(f"unsupported static lookup: {identifier} -> {interface}.{method}({lookup_key})")
-                source_value = mapping[lookup_key]
-                source = {"interface": interface, "instance": provider_id, "lookup": method, "argument": lookup_key}
+                source = {"interface": interface, "instance": provider_id, "lookup": method}
+                if signature:
+                    parameter = next(iter(signature))
+                    source_name = use["args"][parameter]
+                    lookup_key = args[source_name]["value"]
+                    if lookup_key not in mapping:
+                        raise ValueError(f"unsupported static lookup: {identifier} -> {interface}.{method}({lookup_key})")
+                    source_value = mapping[lookup_key]
+                    source["argument"] = lookup_key
+                else:
+                    source_value = mapping
             else:
                 key = use["value"]
                 source_value = expanded[provider_id]["provided"][interface][key]
@@ -238,7 +247,9 @@ def expand(root=ROOT):
             passed = []
             for name, kind in signature.items():
                 source = call["args"][name]
-                available = {**{k: v["value"] for k, v in args.items()}, **values[entry["interface"]]}
+                own_lookups = {k: v for k, v in module.get("lookups", {}).get(entry["interface"], {}).items()
+                               if not interfaces[entry["interface"]]["lookups"][k]["args"]}
+                available = {**{k: v["value"] for k, v in args.items()}, **values[entry["interface"]], **own_lookups}
                 if source not in available or not valid_value(available[source], kind):
                     raise ValueError(f"invalid call argument: {identifier}.{name}")
                 passed.append(available[source])

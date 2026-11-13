@@ -1,18 +1,11 @@
 {
   "id": "login-shell-host@1",
-  "description": "A substrate that provisions supported login shells without exposing its package manager or shell registry.",
+  "description": "A substrate that can provision a supported shell implementation at its declared path.",
   "values": {},
-  "lookups": {
-    "path_for": {
-      "args": {"shell_id": "string"},
-      "returns": "absolute-path",
-      "guarantee": "Pure declaration of the executable path for a supported shell; unsupported shells fail at expansion."
-    }
-  },
   "transitions": {
     "ensure": {
-      "args": {"shell_id": "string", "path": "absolute-path"},
-      "guarantee": "For a supported shell, the path must equal path_for(shell_id); ensure installs it and verifies it can be used as a login shell."
+      "args": {"shell": "string", "path": "absolute-path"},
+      "guarantee": "The supported shell is provisioned and the declared executable path can be used as a login shell."
     }
   }
 }

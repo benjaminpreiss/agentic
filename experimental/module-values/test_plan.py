@@ -11,11 +11,12 @@ class ExpansionTests(unittest.TestCase):
         expanded = expand()
         self.assertEqual([item['id'] for item in expanded], ['host', 'interactive', 'agentic'])
         host, shell, account = expanded
-        self.assertEqual(shell['provided']['login-shell@1']['path'], '/usr/bin/zsh')
-        self.assertEqual(shell['value_sources']['login-shell@1']['path'], {
-            'interface': 'login-shell-host@1', 'instance': 'host', 'lookup': 'path_for', 'argument': 'zsh'})
+        self.assertEqual(shell['actions'][0]['args'], ['zsh', '/usr/bin/zsh'])
+        self.assertEqual(json.loads((ROOT / 'modules/zsh/module.json').read_text())['lookups']['login-shell@1']['path'], '/usr/bin/zsh')
+        self.assertNotIn('zsh', (ROOT / 'interfaces/login-shell.v1.json').read_text().lower())
+        self.assertNotIn('zsh', (ROOT / 'interfaces/login-shell-host.v1.json').read_text().lower())
         self.assertEqual(account['args']['shell_path'], {'value': '/usr/bin/zsh', 'source': {
-            'interface': 'login-shell@1', 'instance': 'interactive', 'value': 'path'}})
+            'interface': 'login-shell@1', 'instance': 'interactive', 'lookup': 'path'}})
         self.assertEqual([step['script'] for item in expanded for step in item['actions']],
                          ['ensure-os.sh', 'ensure-shell.sh', 'ensure-account.sh'])
         self.assertEqual(shell['actions'][0]['provider'], 'host')
@@ -38,10 +39,10 @@ class ExpansionTests(unittest.TestCase):
             self.assertEqual([item['id'] for item in expanded], ['host', 'interactive', 'agentic', 'reviewer'])
             self.assertEqual(expanded[-1]['actions'][0]['args'], ['reviewer', '/usr/bin/zsh'])
             rendered = script(expanded, root)
-            self.assertEqual(rendered.count('zypper -n install "$shell_id"'), 1)
+            self.assertEqual(rendered.count('zypper -n install "$package"'), 1)
             self.assertEqual(rendered.count('useradd -m -s'), 2)
 
-    def test_alternative_host_implementation_supplies_path_and_methods(self):
+    def test_shell_module_owns_path_and_host_owns_provisioning_method(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_experiment(Path(temporary))
             alternative = root / 'modules/alternative-host'
@@ -49,15 +50,25 @@ class ExpansionTests(unittest.TestCase):
             file = alternative / 'module.json'
             module = json.loads(file.read_text())
             module['id'] = 'alternative-host'
-            module['lookups']['login-shell-host@1']['path_for']['zsh'] = '/opt/zsh/bin/zsh'
             file.write_text(json.dumps(module))
+            shell_dir = root / 'modules/zsh-alternative'
+            shutil.copytree(root / 'modules/zsh', shell_dir)
+            shell_file = shell_dir / 'module.json'
+            shell_module = json.loads(shell_file.read_text())
+            shell_module['id'] = 'zsh-alternative'
+            shell_module['lookups']['login-shell@1']['path'] = '/opt/zsh/bin/zsh'
+            shell_file.write_text(json.dumps(shell_module))
+            shell_instance = root / 'instances/interactive.json'
+            shell = json.loads(shell_instance.read_text())
+            shell['module'] = 'zsh-alternative'
+            shell_instance.write_text(json.dumps(shell))
             (alternative / 'ensure-shell.sh').write_text('echo alternative-substrate-method\n')
             host_file = root / 'instances/host.json'
             host = json.loads(host_file.read_text())
             host['module'] = 'alternative-host'
             host_file.write_text(json.dumps(host))
             expanded = expand(root)
-            self.assertEqual(expanded[1]['provided']['login-shell@1']['path'], '/opt/zsh/bin/zsh')
+            self.assertEqual(expanded[1]['actions'][0]['args'], ['zsh', '/opt/zsh/bin/zsh'])
             self.assertEqual(expanded[2]['actions'][0]['args'], ['agentic', '/opt/zsh/bin/zsh'])
             rendered = script(expanded, root)
             self.assertIn('alternative-substrate-method', rendered)
@@ -66,17 +77,14 @@ class ExpansionTests(unittest.TestCase):
     def test_invalid_path_binding_call_and_cycle_fail_before_execution(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_experiment(Path(temporary))
-            host_file = root / 'modules/opensuse-tumbleweed/module.json'
-            host = json.loads(host_file.read_text())
-            host['lookups']['login-shell-host@1']['path_for']['zsh'] = 'relative/zsh'
-            host_file.write_text(json.dumps(host))
+            shell_file = root / 'modules/zsh/module.json'
+            shell_module = json.loads(shell_file.read_text())
+            shell_module['lookups']['login-shell@1']['path'] = 'relative/zsh'
+            shell_file.write_text(json.dumps(shell_module))
             with self.assertRaisesRegex(ValueError, 'invalid lookup declaration'):
                 expand(root)
-            host['lookups']['login-shell-host@1']['path_for'] = {}
-            host_file.write_text(json.dumps(host))
-            with self.assertRaisesRegex(ValueError, 'unsupported static lookup'):
-                expand(root)
-            host_file.write_text((ROOT / 'modules/opensuse-tumbleweed/module.json').read_text())
+            shell_file.write_text((ROOT / 'modules/zsh/module.json').read_text())
+            host_file = root / 'modules/opensuse-tumbleweed/module.json'
             instance_file = root / 'instances/interactive.json'
             instance = json.loads(instance_file.read_text())
             instance['bindings']['login-shell-host@1'] = 'agentic'
