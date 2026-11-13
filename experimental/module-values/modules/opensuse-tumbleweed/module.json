@@ -1,6 +1,6 @@
 {
   "id": "opensuse-tumbleweed",
-  "implements": "os-base@1",
+  "implements": "opensuse-tumbleweed@1",
   "entrypoint": "ensure",
   "requires": [],
   "values": {},

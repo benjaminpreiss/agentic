@@ -10,14 +10,15 @@
 These are separate kinds of interface surface: `login-shell@1.values.path` is a deterministic, typed *static value*; `login-shell@1.transitions.ensure` is an effectful transition. There is no `command -v zsh` discovery or Ansible result substitution. If `/usr/bin/zsh` is wrong on a target, deployment fails its check rather than quietly changing the account declaration. A different Zsh layout requires a different provider declaration/version or an explicitly parameterised instance.
 
 ```text
-interfaces/*.v1.json            canonical static-value types, transitions and written guarantees
-modules/zsh/module.json         implements login-shell@1, declares path=/usr/bin/zsh
-modules/linux-local-account/    implements account@1, uses bound login-shell@1.path
-instances/interactive.json      Zsh instance; binds os-base@1 to host
-instances/agentic.json          account instance; name=agentic; binds login-shell@1 to interactive
+interfaces/opensuse-tumbleweed.v1.json  explicit host contract for this OS
+interfaces/login-shell.v1.json          portable shell contract and static path type
+modules/zsh-on-tumbleweed/              implements login-shell@1; path=/usr/bin/zsh
+modules/tumbleweed-local-account/       implements account@1; uses login-shell@1.path
+instances/interactive.json             binds opensuse-tumbleweed@1 to host
+instances/agentic.json                 name=agentic; binds login-shell@1 to interactive
 ```
 
-**Modules** map transitions to scripts, declare static values, required interfaces and where static values are used. **Instances** have stable identity, literal configuration and provider-instance bindings. The account module contains neither `agentic` nor `/bin/zsh`. A second account instance can reuse the same account module and shell provider; `test_plan.py` exercises this case. These interface files live in this experiment, **not in the framework**; independent publication is still an open packaging question.
+**Modules** map transitions to scripts, declare static values, required interfaces and where static values are used. Both the Zsh implementation and the reusable local-account implementation explicitly require `opensuse-tumbleweed@1`: installing `zsh`, reading `/etc/shells`, and using `getent` are not promises of an abstract Linux base. This avoids adding a shallow package-manager wrapper over Ansible's existing package abstraction. A second OS implementation can reveal which narrower cross-distribution contracts are genuinely shared. **Instances** have stable identity, literal configuration and provider-instance bindings. The account module contains neither `agentic` nor `/bin/zsh`. A second account instance can reuse the same account module and shell provider; `test_plan.py` exercises this case. These interface files live in this experiment, **not in the framework**; independent publication is still an open packaging question.
 
 ## Trying it
 

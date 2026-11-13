@@ -1,8 +1,8 @@
 {
   "id": "interactive",
-  "module": "zsh",
+  "module": "zsh-on-tumbleweed",
   "bindings": {
-    "os-base@1": "host"
+    "opensuse-tumbleweed@1": "host"
   },
   "inputs": {}
 }

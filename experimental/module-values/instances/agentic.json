@@ -1,8 +1,8 @@
 {
   "id": "agentic",
-  "module": "linux-local-account",
+  "module": "tumbleweed-local-account",
   "bindings": {
-    "os-base@1": "host",
+    "opensuse-tumbleweed@1": "host",
     "login-shell@1": "interactive"
   },
   "inputs": {

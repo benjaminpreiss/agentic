@@ -1,0 +1,8 @@
+{
+  "id": "opensuse-tumbleweed@1",
+  "description": "A fresh openSUSE Tumbleweed host with Linux NSS/getent, /etc/shells and system packages available.",
+  "values": {},
+  "transitions": {
+    "ensure": {"args": {}, "guarantee": "Tumbleweed identity and console recovery are confirmed; local passwd lookup and /etc/shells are available."}
+  }
+}
