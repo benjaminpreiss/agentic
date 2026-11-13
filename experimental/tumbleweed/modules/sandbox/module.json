@@ -1,1 +1,1 @@
-{"id":"sandbox","version":"prototype-1","substrate":"nix-packages","status":"not implemented: nono, Herdr, sandboxed launchers, profiles and socket grants","requires":["agent-harnesses"]}
+{"id":"sandbox","version":"prototype-1","substrate":"nix-packages@1","status":"not implemented: nono, Herdr, sandboxed launchers, profiles and socket grants","requires_interfaces":["agent-harnesses@1","nix-packages@1"],"implements":"sandbox@1","entrypoint":"ensure","provides":{"sandbox@1":{"ensure":"introduce.yml"}}}

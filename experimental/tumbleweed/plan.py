@@ -33,8 +33,12 @@ def plan(directory: Path):
             raise ValueError(f"duplicate module {key}")
         if not all(isinstance(module.get(field), str) for field in ("id", "version", "substrate", "status")):
             raise ValueError(f"invalid module: {path}")
-        if not isinstance(module.get("requires"), list):
-            raise ValueError(f"invalid dependencies: {path}")
+        if "requires" in module:
+            raise ValueError(f"use required interfaces, not concrete module dependencies: {path}")
+        if not isinstance(module.get("requires_interfaces"), list):
+            raise ValueError(f"invalid interface dependencies: {path}")
+        if not isinstance(module.get("implements"), str) or not isinstance(module.get("entrypoint"), str):
+            raise ValueError(f"missing provided interface or entrypoint: {path}")
         modules[key] = module
 
     for key, provider_id in bindings.items():
@@ -45,6 +49,13 @@ def plan(directory: Path):
         operations = modules[provider_id].get("provides", {}).get(key)
         if not isinstance(operations, dict):
             raise ValueError(f"{provider_id} does not provide {key}")
+        if set(operations) != set(interfaces[key]["operations"]):
+            raise ValueError(f"{provider_id} does not implement all methods of {key}")
+        if modules[provider_id]["implements"] != key:
+            raise ValueError(f"{provider_id} does not implement its bound interface {key}")
+        entrypoint = modules[provider_id]["entrypoint"]
+        if entrypoint not in operations or interfaces[key]["operations"][entrypoint]["args"]:
+            raise ValueError(f"{provider_id} needs a zero-argument entrypoint")
         for operation, filename in operations.items():
             if operation not in interfaces[key]["operations"] or not re.fullmatch(r"[a-z][a-z0-9-]*\.yml", filename):
                 raise ValueError(f"invalid provider operation: {key}.{operation}")
@@ -52,10 +63,14 @@ def plan(directory: Path):
                 raise ValueError(f"missing provider script: {provider_id}/{filename}")
 
     for key, module in modules.items():
-        required = module.get("requires_interfaces", [])
+        if bindings.get(module["implements"]) != key:
+            raise ValueError(f"unbound implementation: {key} -> {module['implements']}")
+        required = module["requires_interfaces"]
         if not isinstance(required, list) or len(required) != len(set(required)):
             raise ValueError(f"invalid required interfaces: {key}")
-        dependencies = list(module["requires"])
+        if module["substrate"] != "native" and module["substrate"] not in required:
+            raise ValueError(f"substrate must be a required interface: {key}")
+        dependencies = []
         for interface in required:
             if interface not in bindings:
                 raise ValueError(f"unbound interface: {interface}")
@@ -74,6 +89,8 @@ def plan(directory: Path):
             if spec is None or filename is None:
                 raise ValueError(f"unsupported operation: {interface}.{operation}")
             expected = spec["args"]
+            if any(arg_type != "string" for arg_type in expected.values()):
+                raise ValueError(f"unsupported argument type: {interface}.{operation}")
             if set(args) != set(expected) or any(not isinstance(args[name], str) for name in expected):
                 raise ValueError(f"signature mismatch: {key} calls {interface}.{operation}")
             calls.append((provider, filename, interface.split("@")[0], operation, args))
@@ -103,8 +120,9 @@ def plan(directory: Path):
 def playbook(ordered):
     lines = ["---", "- name: Prototype Agentic Tumbleweed introductions", "  hosts: agentic_vm", "  gather_facts: true", "  become: true", "  tasks:"]
     for module in ordered:
-        lines += [f"    - name: Introduce {module['id']}",
-                  f"      ansible.builtin.import_tasks: modules/{module['id']}/introduce.yml"]
+        entrypoint_file = module["provides"][module["implements"]][module["entrypoint"]]
+        lines += [f"    - name: {module['id']} implements {module['implements']}.{module['entrypoint']}",
+                  f"      ansible.builtin.import_tasks: modules/{module['id']}/{entrypoint_file}"]
         for provider, filename, interface, operation, args in module["_calls"]:
             lines += [f"    - name: {module['id']} calls {interface}.{operation}",
                       f"      ansible.builtin.include_tasks: modules/{provider}/{filename}",

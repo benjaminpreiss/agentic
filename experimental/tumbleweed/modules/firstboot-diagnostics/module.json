@@ -1,1 +1,1 @@
-{"id":"firstboot-diagnostics","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"not implemented: network/SSH console checks and recovery verification","requires":["base-access"]}
+{"id":"firstboot-diagnostics","version":"prototype-1","substrate":"os-base@1","status":"not implemented: network/SSH console checks and recovery verification","requires_interfaces":["base-access@1","os-base@1"],"implements":"firstboot-diagnostics@1","entrypoint":"ensure","provides":{"firstboot-diagnostics@1":{"ensure":"introduce.yml"}}}

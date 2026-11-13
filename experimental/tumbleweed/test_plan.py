@@ -6,18 +6,22 @@ import unittest
 from pathlib import Path
 from plan import closure, plan, playbook
 
+ROOT = Path(__file__).resolve().parent
+
 
 class PlannerTests(unittest.TestCase):
-    def test_repo_inventory_is_ordered(self):
-        ordered = plan(Path(__file__).resolve().parent / "modules")
+    def test_every_module_is_bound_and_only_requires_interfaces(self):
+        ordered = plan(ROOT / "modules")
         positions = {module["id"]: i for i, module in enumerate(ordered)}
+        bindings = json.loads((ROOT / "bindings.json").read_text())
         self.assertEqual(len(positions), len(ordered))
         rendered = playbook(ordered)
         for module in ordered:
+            self.assertNotIn("requires", module)
+            self.assertEqual(bindings[module["implements"]], module["id"])
             self.assertIn(f"modules/{module['id']}/introduce.yml", rendered)
             for dep in module["_dependencies"]:
                 self.assertLess(positions[dep], positions[module["id"]])
-        self.assertLess(positions["systemd-timer"], positions["home-backup"])
         self.assertIn("modules/systemd-timer/ensure.yml", rendered)
         self.assertIn('timer_schedule: "*-*-* 03:30:00"', rendered)
         self.assertNotIn("modules/home-backup/agentic-backup.timer", rendered)
@@ -25,28 +29,32 @@ class PlannerTests(unittest.TestCase):
         self.assertIn("modules/systemd-timer/introduce.yml", subset)
         self.assertNotIn("modules/github-integration/introduce.yml", subset)
 
-    def test_generated_subset_contains_only_dependency_closure(self):
-        root = Path(__file__).resolve().parent
-        output = subprocess.check_output([sys.executable, str(root / "plan.py"), "--until", "base-access"], text=True)
-        self.assertIn("modules/opensuse-tumbleweed/introduce.yml", output)
-        self.assertIn("modules/hardware-inventory/introduce.yml", output)
-        self.assertIn("modules/base-access/introduce.yml", output)
+    def test_base_access_closure(self):
+        output = subprocess.check_output([sys.executable, str(ROOT / "plan.py"), "--until", "base-access"], text=True)
+        for name in ("opensuse-tumbleweed", "hardware-inventory", "base-access"):
+            self.assertIn(f"modules/{name}/introduce.yml", output)
         self.assertNotIn("modules/nix-packages/introduce.yml", output)
         self.assertNotIn("modules/firstboot-diagnostics/introduce.yml", output)
 
-    def test_interface_signatures_and_bindings_fail_closed(self):
+    def test_invalid_signature_binding_and_legacy_dependency_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "interfaces").mkdir()
             (root / "modules" / "provider").mkdir(parents=True)
             (root / "modules" / "caller").mkdir()
-            (root / "interfaces" / "timer.v1.json").write_text(json.dumps({
-                "id": "timer", "version": 1, "operations": {"ensure": {"args": {"id": "string"}}}}))
-            (root / "bindings.json").write_text('{"timer@1":"provider"}')
-            provider = {"id": "provider", "version": "1", "substrate": "x", "status": "x", "requires": [],
-                        "provides": {"timer@1": {"ensure": "ensure.yml"}}}
-            caller = {"id": "caller", "version": "1", "substrate": "x", "status": "x", "requires": [],
-                      "requires_interfaces": ["timer@1"], "calls": [{"interface": "timer@1", "operation": "ensure", "args": {"id": "test"}}]}
+            for name in ("timer", "caller"):
+                (root / "interfaces" / f"{name}.v1.json").write_text(json.dumps({
+                    "id": name, "version": 1, "operations": {
+                        "prepare" if name == "timer" else "ensure": {"args": {}},
+                        **({"ensure": {"args": {"id": "string"}}} if name == "timer" else {})}}))
+            (root / "bindings.json").write_text('{"timer@1":"provider","caller@1":"caller"}')
+            provider = {"id": "provider", "version": "1", "substrate": "native", "status": "x",
+                        "requires_interfaces": [], "implements": "timer@1", "entrypoint": "prepare",
+                        "provides": {"timer@1": {"prepare": "introduce.yml", "ensure": "ensure.yml"}}}
+            caller = {"id": "caller", "version": "1", "substrate": "native", "status": "x",
+                      "requires_interfaces": ["timer@1"], "implements": "caller@1", "entrypoint": "ensure",
+                      "provides": {"caller@1": {"ensure": "introduce.yml"}},
+                      "calls": [{"interface": "timer@1", "operation": "ensure", "args": {"id": "test"}}]}
             for name, module in [("provider", provider), ("caller", caller)]:
                 (root / "modules" / name / "module.json").write_text(json.dumps(module))
                 (root / "modules" / name / "introduce.yml").write_text("---\n[]\n")
@@ -57,28 +65,33 @@ class PlannerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "signature mismatch"):
                 plan(root / "modules")
             caller["calls"][0]["args"] = {"id": "test"}
+            caller["requires"] = ["provider"]
             (root / "modules" / "caller" / "module.json").write_text(json.dumps(caller))
-            (root / "bindings.json").write_text('{"timer@1":"other"}')
+            with self.assertRaisesRegex(ValueError, "concrete module dependencies"):
+                plan(root / "modules")
+            caller.pop("requires")
+            (root / "modules" / "caller" / "module.json").write_text(json.dumps(caller))
+            (root / "bindings.json").write_text('{"timer@1":"other","caller@1":"caller"}')
             with self.assertRaisesRegex(ValueError, "missing provider"):
                 plan(root / "modules")
 
-    def test_missing_and_cyclic_dependencies_fail_closed(self):
+    def test_interface_cycle_and_missing_script_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp) / "a"
-            folder.mkdir()
-            file = folder / "module.json"
-            (folder / "introduce.yml").write_text("---\n[]\n")
-            module = {"id": "a", "version": "1", "substrate": "test", "status": "test", "requires": ["missing"]}
+            root = Path(tmp)
+            (root / "interfaces").mkdir()
+            (root / "modules" / "a").mkdir(parents=True)
+            (root / "interfaces" / "a.v1.json").write_text('{"id":"a","version":1,"operations":{"ensure":{"args":{}}}}')
+            (root / "bindings.json").write_text('{"a@1":"a"}')
+            module = {"id": "a", "version": "1", "substrate": "native", "status": "x",
+                      "requires_interfaces": ["a@1"], "implements": "a@1", "entrypoint": "ensure",
+                      "provides": {"a@1": {"ensure": "introduce.yml"}}}
+            file = root / "modules" / "a" / "module.json"
             file.write_text(json.dumps(module))
-            with self.assertRaisesRegex(ValueError, "missing dependency"):
-                plan(Path(tmp))
-            module["requires"] = ["a"]
-            file.write_text(json.dumps(module))
-            with self.assertRaisesRegex(ValueError, "dependency cycle"):
-                plan(Path(tmp))
-            (folder / "introduce.yml").unlink()
             with self.assertRaisesRegex(ValueError, "missing introduction script"):
-                plan(Path(tmp))
+                plan(root / "modules")
+            (file.parent / "introduce.yml").write_text("---\n[]\n")
+            with self.assertRaisesRegex(ValueError, "cannot depend on itself"):
+                plan(root / "modules")
 
 
 if __name__ == "__main__":

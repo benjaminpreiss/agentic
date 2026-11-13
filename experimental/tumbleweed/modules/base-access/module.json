@@ -1,1 +1,1 @@
-{"id":"base-access","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"partial: installs basic tools after console verification; SSH/network/firewall/hardening still pending","requires":["hardware-inventory"]}
+{"id":"base-access","version":"prototype-1","substrate":"os-base@1","status":"partial: installs basic tools after console verification; SSH/network/firewall/hardening still pending","requires_interfaces":["hardware-inventory@1","os-base@1"],"implements":"base-access@1","entrypoint":"ensure","provides":{"base-access@1":{"ensure":"introduce.yml"}}}

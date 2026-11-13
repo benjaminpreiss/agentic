@@ -2,6 +2,7 @@
   "id": "timer",
   "version": 1,
   "operations": {
+    "prepare": {"args": {}},
     "ensure": {"args": {"id": "string", "command": "string", "schedule": "string"}},
     "remove": {"args": {"id": "string"}}
   }

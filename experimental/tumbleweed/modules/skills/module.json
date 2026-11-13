@@ -1,1 +1,1 @@
-{"id":"skills","version":"prototype-1","substrate":"agent-harnesses","status":"not implemented: selected versioned skills and ownership-safe links","requires":["agent-harnesses"]}
+{"id":"skills","version":"prototype-1","substrate":"agent-harnesses@1","status":"not implemented: selected versioned skills and ownership-safe links","requires_interfaces":["agent-harnesses@1"],"implements":"skills@1","entrypoint":"ensure","provides":{"skills@1":{"ensure":"introduce.yml"}}}

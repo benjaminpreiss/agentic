@@ -1,1 +1,1 @@
-{"id":"hardware-inventory","version":"prototype-1","substrate":"opensuse-tumbleweed","status":"implemented: report only; no driver removal","requires":["opensuse-tumbleweed"]}
+{"id":"hardware-inventory","version":"prototype-1","substrate":"os-base@1","status":"implemented: report only; no driver removal","requires_interfaces":["os-base@1"],"implements":"hardware-inventory@1","entrypoint":"ensure","provides":{"hardware-inventory@1":{"ensure":"introduce.yml"}}}

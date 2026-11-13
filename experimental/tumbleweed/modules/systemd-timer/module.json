@@ -1,8 +1,10 @@
 {
   "id": "systemd-timer",
   "version": "prototype-1",
-  "substrate": "opensuse-tumbleweed",
+  "substrate": "os-base@1",
   "status": "prototype: timer interface backed by systemd; untested on Tumbleweed VM",
-  "requires": ["opensuse-tumbleweed"],
-  "provides": {"timer@1": {"ensure": "ensure.yml", "remove": "remove.yml"}}
+  "requires_interfaces": ["os-base@1"],
+  "implements": "timer@1",
+  "entrypoint": "prepare",
+  "provides": {"timer@1": {"prepare": "introduce.yml", "ensure": "ensure.yml", "remove": "remove.yml"}}
 }
