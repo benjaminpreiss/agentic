@@ -1,0 +1,8 @@
+{
+  "id": "interactive",
+  "module": "zsh-on-tumbleweed",
+  "bindings": {
+    "os@1": "host"
+  },
+  "inputs": {}
+}

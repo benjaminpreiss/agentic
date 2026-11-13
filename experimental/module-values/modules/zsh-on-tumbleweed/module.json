@@ -1,0 +1,9 @@
+{
+  "id": "zsh-on-tumbleweed",
+  "implements": "login-shell@1",
+  "entrypoint": "ensure",
+  "requires": ["os@1"],
+  "lookups": {"path": "/usr/bin/zsh"},
+  "transitions": {"ensure": "ensure.sh"},
+  "script_args": ["path"]
+}

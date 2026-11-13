@@ -1,0 +1,8 @@
+{
+  "id": "account@1",
+  "description": "A configured local login account on the target host.",
+  "values": {},
+  "transitions": {
+    "ensure": {"args": {}, "guarantee": "The account exists with its declared login shell and a non-root identity; ensuring it does not grant administrative membership."}
+  }
+}

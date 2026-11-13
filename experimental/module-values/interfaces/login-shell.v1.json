@@ -1,0 +1,11 @@
+{
+  "id": "login-shell@1",
+  "description": "A configured login shell on the target host.",
+  "values": {},
+  "lookups": {
+    "path": {"args": {}, "returns": "absolute-path", "guarantee": "Pure declared executable path of this shell instance."}
+  },
+  "transitions": {
+    "ensure": {"args": {}, "guarantee": "The declared executable path is usable as a login shell on the target."}
+  }
+}

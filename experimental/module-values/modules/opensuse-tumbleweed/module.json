@@ -1,0 +1,9 @@
+{
+  "id": "opensuse-tumbleweed",
+  "implements": "os@1",
+  "entrypoint": "ensure",
+  "requires": [],
+  "lookups": {},
+  "transitions": {"ensure": "ensure-os.sh"},
+  "script_args": []
+}

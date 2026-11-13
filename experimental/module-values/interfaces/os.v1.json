@@ -1,0 +1,11 @@
+{
+  "id": "os@1",
+  "description": "An operating system substrate on the target host.",
+  "values": {},
+  "transitions": {
+    "ensure": {
+      "args": {},
+      "guarantee": "The substrate is supported by this implementation and its recovery preconditions have been checked."
+    }
+  }
+}
