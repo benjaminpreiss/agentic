@@ -1,0 +1,8 @@
+{
+  "id": "linux-local-account",
+  "implements": "account@1",
+  "requires": ["os@1", "login-shell@1"],
+  "values": {},
+  "config": {"account_name": "string"},
+  "uses": [{"interface": "login-shell@1", "value": "path", "as": "shell_path"}]
+}

@@ -1,0 +1,5 @@
+{
+  "id": "account@1",
+  "description": "A configured local login account bound to a login shell.",
+  "values": {}
+}

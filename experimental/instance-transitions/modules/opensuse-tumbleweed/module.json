@@ -1,0 +1,8 @@
+{
+  "id": "opensuse-tumbleweed",
+  "implements": "os@1",
+  "requires": [],
+  "values": {},
+  "config": {},
+  "uses": []
+}

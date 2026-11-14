@@ -1,0 +1,5 @@
+{
+  "id": "os@1",
+  "description": "An operating-system substrate bound into the deployment.",
+  "values": {}
+}

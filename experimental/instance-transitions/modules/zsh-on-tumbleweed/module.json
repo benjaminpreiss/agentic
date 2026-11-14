@@ -1,0 +1,8 @@
+{
+  "id": "zsh-on-tumbleweed",
+  "implements": "login-shell@1",
+  "requires": ["os@1"],
+  "values": {"path": "/usr/bin/zsh"},
+  "config": {},
+  "uses": []
+}
