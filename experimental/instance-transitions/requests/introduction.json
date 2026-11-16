@@ -1,7 +1,7 @@
 {
   "transitions": [
-    {"instance": "host", "transition": "introduce-os"},
-    {"instance": "interactive", "transition": "introduce-zsh"},
-    {"instance": "agentic", "transition": "introduce-account"}
+    {"instance": "host", "transition": {"kind": "transition", "publisher": "did:web:agentic.invalid", "name": "introduce-os", "version": 1}},
+    {"instance": "interactive", "transition": {"kind": "transition", "publisher": "did:web:agentic.invalid", "name": "introduce-zsh", "version": 1}},
+    {"instance": "agentic", "transition": {"kind": "transition", "publisher": "did:web:agentic.invalid", "name": "introduce-account", "version": 1}}
   ]
 }

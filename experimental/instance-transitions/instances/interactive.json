@@ -1,1 +1,6 @@
-{"id": "interactive", "module": "zsh-on-tumbleweed", "bindings": {"os@1": "host"}, "inputs": {}}
+{
+  "id": "interactive",
+  "module": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1},
+  "bindings": [{"interface": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "os", "version": 1}, "instance": "host"}],
+  "inputs": {}
+}

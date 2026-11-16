@@ -1,8 +1,8 @@
 {
-  "id": "introduce-account",
-  "interface": "account@1",
+  "id": {"kind": "transition", "publisher": "did:web:agentic.invalid", "name": "introduce-account", "version": 1},
+  "interface": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "account", "version": 1},
   "from": null,
-  "to": "linux-local-account",
+  "to": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "linux-local-account", "version": 1},
   "script": "run.sh",
   "args": [
     {"side": "to", "name": "account_name"},

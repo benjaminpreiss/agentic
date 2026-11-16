@@ -4,6 +4,12 @@ The language for this independent draft's declarations and deployment operations
 
 ## Language
 
+**Artifact identity**:
+A `(kind, publisher, name, version)` coordinate identifying a declared interface, module or transition. An instance has a separate deployment-scoped identity.
+
+**Publisher**:
+The DID claimed as the owner of an artifact coordinate; claiming it is not proof of authorization to publish under it.
+
 **Interface**:
 A versioned concept whose values can be requested by dependent modules without knowing an implementation.
 

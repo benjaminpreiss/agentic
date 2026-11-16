@@ -1,6 +1,6 @@
 # Independent draft: module instances and separate deployment transitions
 
-**Question:** Can modules declare only interface capabilities and static information while independent transitions bring instances into use? This experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later.
+**Question:** Can modules declare only interface capabilities and static information while independent transitions bring instances into use? This experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact references now use structured `(kind, publisher, name, version)` coordinates.
 
 ```text
 interfaces/{os,login-shell,account}.v1.json  conceptual contracts and static value types
@@ -12,6 +12,14 @@ transitions/introduce-zsh/{transition.json,run.sh}
 transitions/introduce-account/{transition.json,run.sh}
 plan.py                                validates requests, resolves arguments, orders dependencies
 ```
+
+Every interface, module and transition declares a structured artifact identity, and references use the same shape:
+
+```json
+{"kind": "module", "publisher": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1}
+```
+
+`kind` distinguishes artifact categories; `publisher` is an opaque **claimed DID**; `name` is local to that publisher and kind; `version` is a positive artifact revision, independent of PostgreSQL or other installed software versions. The planner rejects duplicate coordinates within its loaded artifact set and validates the kind of each reference. Artifact file paths do not define identity, so different versions can coexist. `did:web:agentic.invalid` is an intentionally **unresolvable fixture**, not a verified publisher. No DID resolution, signature, authorization, canonical-byte packaging or historical immutability enforcement exists here. A future publication process must prevent republishing changed bytes under the same coordinate; an identifier alone cannot establish trust or globally prevent an imposter from claiming a publisher. Instance IDs such as `agentic` remain stable and deployment-scoped, not versioned artifact IDs.
 
 A **transition** has an exact `from` module and `to` module for one interface. `null → module` introduces an instance, `module A → module B` changes its implementation, and `module → null` removes it. At least one endpoint must be non-null. Each transition has **its own directory and script**; scripts do not live in modules. The request explicitly names each transition and instance; the planner neither chooses one from a previous-state file nor keeps an execution log. `from: null` is a declaration of the intended operation, **not proof of absence on the target**. An old→new migration script must check its real target-side preconditions before changing anything. Only three introduction transitions ship here. Upgrade/removal scripts in tests are synthetic selection examples, not deployable migrations.
 

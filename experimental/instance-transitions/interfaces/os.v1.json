@@ -1,5 +1,5 @@
 {
-  "id": "os@1",
+  "id": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "os", "version": 1},
   "description": "An operating-system substrate bound into the deployment.",
   "values": {}
 }

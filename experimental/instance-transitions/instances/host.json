@@ -1,1 +1,5 @@
-{"id": "host", "module": "opensuse-tumbleweed", "bindings": {}, "inputs": {}}
+{
+  "id": "host",
+  "module": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1},
+  "bindings": [], "inputs": {}
+}
