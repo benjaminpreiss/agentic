@@ -10,6 +10,9 @@ A `(kind, authority, name, version)` coordinate identifying a declared interface
 **Authority**:
 The stable DID claimed to control an artifact name and its versions. It is not verified by this draft; a future publisher may act on the authority's behalf.
 
+**Artifact reference**:
+A compact string naming an artifact coordinate. It is either scoped to the enclosing declaration's authority or written as a DID URL with a project-defined artifact fragment; neither form proves that the artifact was published by that authority.
+
 **Interface**:
 A versioned concept whose values can be requested by dependent modules without knowing an implementation.
 

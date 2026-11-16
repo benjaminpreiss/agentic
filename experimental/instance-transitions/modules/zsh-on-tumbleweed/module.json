@@ -1,7 +1,7 @@
 {
   "kind": "module", "authority": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1,
-  "implements": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "login-shell", "version": 1},
-  "requires": [{"kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1}],
+  "implements": "interface/login-shell@1",
+  "requires": ["interface/os@1"],
   "values": {"path": "/usr/bin/zsh"},
   "config": {},
   "uses": []

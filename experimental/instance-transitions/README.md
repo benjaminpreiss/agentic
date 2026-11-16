@@ -1,6 +1,6 @@
 # Independent draft: module instances and separate deployment transitions
 
-**Question:** Can modules declare only interface capabilities and static information while independent transitions bring instances into use? This experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact references now use structured `(kind, authority, name, version)` coordinates.
+**Question:** Can modules declare only interface capabilities and static information while independent transitions bring instances into use? This experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact declarations use `(kind, authority, name, version)` coordinates; references have a compact string syntax.
 
 ```text
 interfaces/{os,login-shell,account}.v1.json  conceptual contracts and static value types
@@ -13,7 +13,7 @@ transitions/introduce-account/{transition.json,run.sh}
 plan.py                                validates requests, resolves arguments, orders dependencies
 ```
 
-Every interface, module and transition declares its artifact identity **at the document root**, rather than under an `id` wrapper. References use the same four fields as a structured value:
+Every interface, module and transition declares its artifact identity **at the document root**, rather than under an `id` wrapper. Within an artifact declaration, references may omit the enclosing authority:
 
 ```json
 {
@@ -21,9 +21,12 @@ Every interface, module and transition declares its artifact identity **at the d
   "authority": "did:web:agentic.invalid",
   "name": "linux-local-account",
   "version": 1,
-  "implements": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "account", "version": 1}
+  "implements": "interface/account@1",
+  "requires": ["interface/os@1", "interface/login-shell@1"]
 }
 ```
+
+A cross-authority reference—or any reference from an instance or transition request, which has no enclosing authority—uses `did:<method>:<id>#<kind>/<name>@<version>`, for example `did:web:agentic.invalid#module/linux-local-account@1`. The fragment is **this experiment's artifact-coordinate convention** inside DID URL syntax. It is not a new DID method, an implemented DID URL dereferencing profile, or a claim that resolving the DID yields the artifact. The planner parses and type-checks the string against locally loaded JSON documents; it never contacts a DID resolver. The expanded plan shows normalized structured coordinates for inspection.
 
 `kind` distinguishes artifact categories; `authority` is an opaque **claimed DID** controlling the name; `name` is local to that authority and kind; `version` is a positive artifact revision, independent of PostgreSQL or other installed software versions. The planner rejects duplicate coordinates within its loaded artifact set and validates the kind of each reference. Artifact file paths do not define identity, so different versions can coexist. `did:web:agentic.invalid` is an intentionally **unresolvable fixture**, not a verified authority or a decision to use `did:web` for publication. No DID resolution, signature, authorization, canonical-byte packaging or historical immutability enforcement exists here. A future publication process must prevent republishing changed bytes under the same coordinate; an identifier alone cannot establish trust or globally prevent an imposter from claiming authority. Instance IDs such as `agentic` remain stable and deployment-scoped, not versioned artifact IDs.
 

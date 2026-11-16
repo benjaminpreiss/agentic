@@ -1,6 +1,6 @@
 {
   "kind": "module", "authority": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1,
-  "implements": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1},
+  "implements": "interface/os@1",
   "requires": [],
   "values": {},
   "config": {},

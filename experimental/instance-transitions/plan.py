@@ -12,6 +12,30 @@ ARG = re.compile(r"[a-z][a-z0-9_]*\Z")
 DID = re.compile(r"did:[a-z0-9]+:[A-Za-z0-9._:%-]+\Z")
 PATH = re.compile(r"/[A-Za-z0-9_./-]+\Z")
 ID_FIELDS = {"kind", "authority", "name", "version"}
+LOCAL_REF = re.compile(r"(interface|module|transition)/([a-z][a-z0-9-]*)@([1-9][0-9]*)\Z")
+FULL_REF = re.compile(r"(did:[a-z0-9]+:[A-Za-z0-9._:%-]+)#(interface|module|transition)/([a-z][a-z0-9-]*)@([1-9][0-9]*)\Z")
+
+
+def reference_id(raw, kind, local_authority=None):
+    """Expand a DID URL or an artifact-local shorthand; never dereference a DID."""
+    if not isinstance(raw, str):
+        raise ValueError(f"invalid {kind} reference: {raw!r}")
+    match = FULL_REF.fullmatch(raw)
+    if match:
+        authority, actual_kind, name, version = match.groups()
+    else:
+        match = LOCAL_REF.fullmatch(raw)
+        if not match or local_authority is None:
+            raise ValueError(f"invalid or unscoped {kind} reference: {raw!r}")
+        actual_kind, name, version = match.groups()
+        authority = local_authority
+    return artifact_id({"kind": actual_kind, "authority": authority,
+                        "name": name, "version": int(version)}, kind)
+
+
+def absolute_reference(raw, kind, local_authority):
+    identified = reference_id(raw, kind, local_authority)
+    return f"{identified[1]}#{identified[0]}/{identified[2]}@{identified[3]}"
 
 
 def artifact_id(raw, kind):
@@ -25,7 +49,7 @@ def artifact_id(raw, kind):
 
 
 def artifact_ref(doc):
-    """Use the same structured coordinate shape for references, without declaration fields."""
+    """Show a normalized structured coordinate in expanded plans and diagnostics."""
     return {field: doc[field] for field in ("kind", "authority", "name", "version")}
 
 
@@ -72,13 +96,13 @@ def load(root):
 
     modules = documents(root, "module")
     for key, mod in modules.items():
-        interface = artifact_id(mod.get("implements"), "interface")
+        interface = reference_id(mod.get("implements"), "interface", mod["authority"])
         if interface not in interfaces or any(k in mod for k in ("transitions", "scripts", "entrypoint")):
             raise ValueError(f"invalid module capabilities: {artifact_ref(mod)}")
         required = mod.get("requires")
         if not isinstance(required, list):
             raise ValueError(f"invalid required interfaces: {artifact_ref(mod)}")
-        required_ids = [artifact_id(i, "interface") for i in required]
+        required_ids = [reference_id(i, "interface", mod["authority"]) for i in required]
         if len(set(required_ids)) != len(required_ids) or any(i not in interfaces for i in required_ids):
             raise ValueError(f"invalid required interfaces: {artifact_ref(mod)}")
         declared = mod.get("values")
@@ -95,7 +119,7 @@ def load(root):
         for use in uses:
             if not isinstance(use, dict) or set(use) != {"interface", "value", "as"}:
                 raise ValueError(f"invalid module use: {artifact_ref(mod)}")
-            source = artifact_id(use["interface"], "interface")
+            source = reference_id(use["interface"], "interface", mod["authority"])
             if (source not in required_ids or use["value"] not in interfaces[source]["values"]
                     or not isinstance(use["as"], str) or not ARG.fullmatch(use["as"])
                     or use["as"] in dests):
@@ -107,13 +131,14 @@ def load(root):
         source, destination = transition.get("from"), transition.get("to")
         if source is None and destination is None:
             raise ValueError(f"transition needs a from or to module: {artifact_ref(transition)}")
-        interface = artifact_id(transition.get("interface"), "interface")
+        interface = reference_id(transition.get("interface"), "interface", transition["authority"])
         if interface not in interfaces:
             raise ValueError(f"unknown transition interface: {artifact_ref(transition)}")
         for endpoint in (source, destination):
             if endpoint is not None:
-                module_id = artifact_id(endpoint, "module")
-                if module_id not in modules or artifact_id(modules[module_id]["implements"], "interface") != interface:
+                module_id = reference_id(endpoint, "module", transition["authority"])
+                if (module_id not in modules or reference_id(modules[module_id]["implements"], "interface",
+                                                           modules[module_id]["authority"]) != interface):
                     raise ValueError(f"transition endpoint does not implement interface: {artifact_ref(transition)}")
         if transition.get("script") != "run.sh" or not (root / transition["_file"].parent / "run.sh").is_file():
             raise ValueError(f"missing transition script: {artifact_ref(transition)}")
@@ -141,7 +166,7 @@ def read_desired(root):
             if doc.get("bindings", []) or doc.get("inputs", {}):
                 raise ValueError(f"removed instance cannot have desired bindings or inputs: {name}")
         else:
-            artifact_id(doc["module"], "module")
+            reference_id(doc["module"], "module")
         result[name] = doc
     return result
 
@@ -156,7 +181,7 @@ def read_requests(file, transitions):
                 or set(entry) - {"instance", "transition", "from_inputs", "from_bindings"}
                 or not isinstance(entry["instance"], str) or entry["instance"] in by_instance):
             raise ValueError("invalid or duplicate transition request")
-        transition_id = artifact_id(entry["transition"], "transition")
+        transition_id = reference_id(entry["transition"], "transition")
         if transition_id not in transitions:
             raise ValueError(f"unknown requested transition: {entry['instance']}")
         by_instance[entry["instance"]] = entry
@@ -171,7 +196,7 @@ def bindings_for(entry):
     for binding in bindings:
         if not isinstance(binding, dict) or set(binding) != {"interface", "instance"}:
             raise ValueError("invalid binding")
-        interface = artifact_id(binding["interface"], "interface")
+        interface = reference_id(binding["interface"], "interface")
         if interface in result or not isinstance(binding["instance"], str):
             raise ValueError("duplicate or invalid binding")
         result[interface] = binding["instance"]
@@ -181,9 +206,9 @@ def bindings_for(entry):
 def resolve(name, entries, modules, interfaces):
     """Resolve the static declaration on one side of a transition (never inspect a host)."""
     instance = entries[name]
-    mod = modules[artifact_id(instance["module"], "module")]
+    mod = modules[reference_id(instance["module"], "module")]
     bindings = bindings_for(instance)
-    required = {artifact_id(i, "interface") for i in mod["requires"]}
+    required = {reference_id(i, "interface", mod["authority"]) for i in mod["requires"]}
     if set(bindings) != required:
         raise ValueError(f"missing or unexpected binding: {name}")
     config = instance.get("inputs", {})
@@ -196,15 +221,19 @@ def resolve(name, entries, modules, interfaces):
     args.update({key: {"value": value, "source": "module"} for key, value in mod["values"].items()})
     for interface, provider in bindings.items():
         if (provider not in entries or entries[provider]["module"] is None or provider == name
-                or artifact_id(modules[artifact_id(entries[provider]["module"], "module")]["implements"], "interface") != interface):
+                or reference_id(modules[reference_id(entries[provider]["module"], "module")]["implements"], "interface",
+                                modules[reference_id(entries[provider]["module"], "module")]["authority"]) != interface):
             raise ValueError(f"binding does not provide {interface}: {name} -> {provider}")
     for use in mod.get("uses", []):
-        interface, value_name = artifact_id(use["interface"], "interface"), use["value"]
+        interface, value_name = reference_id(use["interface"], "interface", mod["authority"]), use["value"]
         provider = bindings[interface]
-        provider_module = modules[artifact_id(entries[provider]["module"], "module")]
+        provider_module = modules[reference_id(entries[provider]["module"], "module")]
         args[use["as"]] = {"value": provider_module["values"][value_name],
-                           "source": {"interface": use["interface"], "instance": provider, "value": value_name}}
-    return {"module": artifact_ref(mod), "interface": mod["implements"], "bindings": bindings, "args": args}
+                           "source": {"interface": artifact_ref(interfaces[interface]),
+                                      "instance": provider, "value": value_name}}
+    own_interface = reference_id(mod["implements"], "interface", mod["authority"])
+    return {"module": artifact_ref(mod), "interface": artifact_ref(interfaces[own_interface]),
+            "bindings": bindings, "args": args}
 
 
 def order(names, entries):
@@ -241,25 +270,29 @@ def expand(root=ROOT, request_file=None):
         raise ValueError("requests must explicitly name every desired instance")
     sources = {}
     for name, entry in requests.items():
-        transition = transitions[artifact_id(entry["transition"], "transition")]
-        if desired[name]["module"] != transition.get("to"):
+        transition = transitions[reference_id(entry["transition"], "transition")]
+        if (desired[name]["module"] is None) != (transition.get("to") is None) or (
+                desired[name]["module"] is not None and
+                reference_id(desired[name]["module"], "module") !=
+                reference_id(transition["to"], "module", transition["authority"])):
             raise ValueError(f"requested transition to does not match desired module: {name}")
         if transition.get("from") is None and (entry.get("from_inputs") or entry.get("from_bindings")):
             raise ValueError(f"absent from cannot have bindings or inputs: {name}")
-        sources[name] = {"module": transition.get("from"), "inputs": entry.get("from_inputs", {}),
-                         "bindings": entry.get("from_bindings", [])}
+        from_ref = transition.get("from")
+        sources[name] = {"module": absolute_reference(from_ref, "module", transition["authority"]) if from_ref else None,
+                         "inputs": entry.get("from_inputs", {}), "bindings": entry.get("from_bindings", [])}
 
     active_names = [n for n in desired if desired[n]["module"] is not None]
     removed = [n for n in sources if sources[n]["module"] is not None and desired[n]["module"] is None]
     ordered = order(active_names, desired) + list(reversed(order(removed, sources)))
     plan = []
     for name in ordered:
-        transition = transitions[artifact_id(requests[name]["transition"], "transition")]
+        transition = transitions[reference_id(requests[name]["transition"], "transition")]
         before, after = transition.get("from"), transition.get("to")
         old = resolve(name, sources, modules, interfaces) if before is not None else None
         new = resolve(name, desired, modules, interfaces) if after is not None else None
         interface = (new or old)["interface"]
-        if interface != transition["interface"]:
+        if reference_id(transition["interface"], "interface", transition["authority"]) != artifact_id(interface, "interface"):
             raise ValueError(f"requested transition interface mismatch: {name}")
         args = []
         for arg in transition["args"]:
@@ -269,7 +302,9 @@ def expand(root=ROOT, request_file=None):
             args.append({"value": endpoint["args"][arg["name"]]["value"], "source":
                         {"side": arg["side"], "detail": endpoint["args"][arg["name"]]["source"]}})
         plan.append({"instance": name, "transition": artifact_ref(transition), "interface": interface,
-                     "from": before, "to": after, "dependencies": list((new or old)["bindings"].values()),
+                     "from": artifact_ref(modules[reference_id(before, "module", transition["authority"])]) if before else None,
+                     "to": artifact_ref(modules[reference_id(after, "module", transition["authority"])]) if after else None,
+                     "dependencies": list((new or old)["bindings"].values()),
                      "script": str(transition["_file"].parent / "run.sh"), "args": args})
     return plan
 

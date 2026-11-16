@@ -1,14 +1,11 @@
 {
   "kind": "module", "authority": "did:web:agentic.invalid", "name": "linux-local-account", "version": 1,
-  "implements": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "account", "version": 1},
-  "requires": [
-    {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1},
-    {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "login-shell", "version": 1}
-  ],
+  "implements": "interface/account@1",
+  "requires": ["interface/os@1", "interface/login-shell@1"],
   "values": {},
   "config": {"account_name": "string"},
   "uses": [{
-    "interface": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "login-shell", "version": 1},
+    "interface": "interface/login-shell@1",
     "value": "path", "as": "shell_path"
   }]
 }

@@ -1,7 +1,7 @@
 {
   "kind": "transition", "authority": "did:web:agentic.invalid", "name": "introduce-os", "version": 1,
-  "interface": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1},
+  "interface": "interface/os@1",
   "from": null,
-  "to": {"kind": "module", "authority": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1},
+  "to": "module/opensuse-tumbleweed@1",
   "script": "run.sh", "args": []
 }
