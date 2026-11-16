@@ -1,9 +1,9 @@
 {
   "id": "agentic",
-  "module": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "linux-local-account", "version": 1},
+  "module": {"kind": "module", "authority": "did:web:agentic.invalid", "name": "linux-local-account", "version": 1},
   "bindings": [
-    {"interface": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "os", "version": 1}, "instance": "host"},
-    {"interface": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "login-shell", "version": 1}, "instance": "interactive"}
+    {"interface": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1}, "instance": "host"},
+    {"interface": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "login-shell", "version": 1}, "instance": "interactive"}
   ],
   "inputs": {"account_name": "agentic"}
 }

@@ -1,5 +1,5 @@
 {
-  "kind": "interface", "publisher": "did:web:agentic.invalid", "name": "account", "version": 1,
+  "kind": "interface", "authority": "did:web:agentic.invalid", "name": "account", "version": 1,
   "description": "A configured local login account bound to a login shell.",
   "values": {}
 }

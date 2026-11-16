@@ -5,11 +5,11 @@ import unittest
 from pathlib import Path
 from plan import ROOT, artifact_id, expand, script
 
-PUBLISHER = 'did:web:agentic.invalid'  # fixture only; NOT resolved or authenticated
+AUTHORITY = 'did:web:agentic.invalid'  # claimed fixture; NOT resolved or authenticated
 
 
-def ref(kind, name, version=1, publisher=PUBLISHER):
-    return {'kind': kind, 'publisher': publisher, 'name': name, 'version': version}
+def ref(kind, name, version=1, authority=AUTHORITY):
+    return {'kind': kind, 'authority': authority, 'name': name, 'version': version}
 
 
 class TransitionTests(unittest.TestCase):
@@ -33,8 +33,8 @@ class TransitionTests(unittest.TestCase):
                 declaration = json.loads(file.read_text())
                 self.assertNotIn('id', declaration)
                 self.assertEqual(set(ref(declaration['kind'], declaration['name'],
-                                             declaration['version'], declaration['publisher'])),
-                                 {'kind', 'publisher', 'name', 'version'})
+                                             declaration['version'], declaration['authority'])),
+                                 {'kind', 'authority', 'name', 'version'})
                 if directory == 'modules':
                     self.assertFalse({'script', 'transitions', 'entrypoint'} & set(declaration))
 
@@ -103,7 +103,7 @@ class TransitionTests(unittest.TestCase):
         self.assertNotEqual(artifact_id(ref('module', 'shared'), 'module'),
                             artifact_id(ref('interface', 'shared'), 'interface'))
         self.assertNotEqual(artifact_id(ref('module', 'shared'), 'module'),
-                            artifact_id(ref('module', 'shared', publisher='did:web:other.invalid'), 'module'))
+                            artifact_id(ref('module', 'shared', authority='did:web:other.invalid'), 'module'))
         self.assertNotEqual(artifact_id(ref('module', 'shared'), 'module'),
                             artifact_id(ref('module', 'shared', version=2), 'module'))
         with self.assertRaisesRegex(ValueError, 'invalid module identity'):
@@ -118,10 +118,10 @@ class TransitionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'duplicate artifact identity'):
                 expand(root)
             other = json.loads((duplicate / 'module.json').read_text())
-            other['publisher'] = 'did:web:other.invalid'
+            other['authority'] = 'did:web:other.invalid'
             (duplicate / 'module.json').write_text(json.dumps(other))
             self.assertEqual(expand(root)[0]['to'], ref('module', 'opensuse-tumbleweed'))
-            other['publisher'] = PUBLISHER
+            other['authority'] = AUTHORITY
             other['version'] = 2
             (duplicate / 'module.json').write_text(json.dumps(other))
             self.assertEqual(expand(root)[0]['to'], ref('module', 'opensuse-tumbleweed'))

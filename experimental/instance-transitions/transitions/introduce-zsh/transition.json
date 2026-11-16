@@ -1,8 +1,8 @@
 {
-  "kind": "transition", "publisher": "did:web:agentic.invalid", "name": "introduce-zsh", "version": 1,
-  "interface": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "login-shell", "version": 1},
+  "kind": "transition", "authority": "did:web:agentic.invalid", "name": "introduce-zsh", "version": 1,
+  "interface": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "login-shell", "version": 1},
   "from": null,
-  "to": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1},
+  "to": {"kind": "module", "authority": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1},
   "script": "run.sh",
   "args": [{"side": "to", "name": "path"}]
 }

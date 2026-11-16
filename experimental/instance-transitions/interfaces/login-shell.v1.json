@@ -1,5 +1,5 @@
 {
-  "kind": "interface", "publisher": "did:web:agentic.invalid", "name": "login-shell", "version": 1,
+  "kind": "interface", "authority": "did:web:agentic.invalid", "name": "login-shell", "version": 1,
   "description": "A configured login shell with a statically declared executable path.",
   "values": {"path": {"type": "absolute-path", "guarantee": "The provider declares this path before target execution."}}
 }

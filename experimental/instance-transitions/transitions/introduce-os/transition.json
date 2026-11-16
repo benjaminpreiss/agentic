@@ -1,7 +1,7 @@
 {
-  "kind": "transition", "publisher": "did:web:agentic.invalid", "name": "introduce-os", "version": 1,
-  "interface": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "os", "version": 1},
+  "kind": "transition", "authority": "did:web:agentic.invalid", "name": "introduce-os", "version": 1,
+  "interface": {"kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1},
   "from": null,
-  "to": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1},
+  "to": {"kind": "module", "authority": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1},
   "script": "run.sh", "args": []
 }

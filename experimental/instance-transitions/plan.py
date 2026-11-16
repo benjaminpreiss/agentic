@@ -11,22 +11,22 @@ NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 ARG = re.compile(r"[a-z][a-z0-9_]*\Z")
 DID = re.compile(r"did:[a-z0-9]+:[A-Za-z0-9._:%-]+\Z")
 PATH = re.compile(r"/[A-Za-z0-9_./-]+\Z")
-ID_FIELDS = {"kind", "publisher", "name", "version"}
+ID_FIELDS = {"kind", "authority", "name", "version"}
 
 
 def artifact_id(raw, kind):
     """Canonical in-process key. A DID is an opaque claim, NOT resolved or authenticated here."""
     if (not isinstance(raw, dict) or set(raw) != ID_FIELDS or raw["kind"] != kind
-            or not isinstance(raw["publisher"], str) or not DID.fullmatch(raw["publisher"])
+            or not isinstance(raw["authority"], str) or not DID.fullmatch(raw["authority"])
             or not isinstance(raw["name"], str) or not NAME.fullmatch(raw["name"])
             or type(raw["version"]) is not int or raw["version"] < 1):
         raise ValueError(f"invalid {kind} identity: {raw!r}")
-    return (kind, raw["publisher"], raw["name"], raw["version"])
+    return (kind, raw["authority"], raw["name"], raw["version"])
 
 
 def artifact_ref(doc):
     """Use the same structured coordinate shape for references, without declaration fields."""
-    return {field: doc[field] for field in ("kind", "publisher", "name", "version")}
+    return {field: doc[field] for field in ("kind", "authority", "name", "version")}
 
 
 def declaration_id(doc, kind):
@@ -286,7 +286,7 @@ def script(plan, root=ROOT):
             raise ValueError("transition script contains its here-document delimiter")
         args = " ".join(shlex.quote(arg["value"]) for arg in step["args"])
         transition = step["transition"]
-        lines.extend([f"# {step['instance']}: {transition['publisher']}/{transition['name']}@{transition['version']}",
+        lines.extend([f"# {step['instance']}: {transition['authority']}/{transition['name']}@{transition['version']}",
                       f"sh -s -- {args} <<'{marker}'", content, marker])
     return "\n".join(lines) + "\n"
 
