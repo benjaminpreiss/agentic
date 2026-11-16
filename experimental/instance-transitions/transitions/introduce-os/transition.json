@@ -1,8 +1,8 @@
 {
   "id": "introduce-os",
   "interface": "os@1",
-  "start": null,
-  "end": "opensuse-tumbleweed",
+  "from": null,
+  "to": "opensuse-tumbleweed",
   "script": "run.sh",
   "args": []
 }

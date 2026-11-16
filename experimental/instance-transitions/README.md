@@ -13,7 +13,7 @@ transitions/introduce-account/{transition.json,run.sh}
 plan.py                                validates requests, resolves arguments, orders dependencies
 ```
 
-A **transition** has an exact `start` module and `end` module for one interface. `null → module` introduces an instance, `module A → module B` changes its implementation, and `module → null` removes it. At least one endpoint must be non-null. Each transition has **its own directory and script**; scripts do not live in modules. The request explicitly names each transition and instance; the planner neither chooses one from a previous-state file nor keeps an execution log. `start: null` is a declaration of the intended operation, **not proof of absence on the target**. An old→new migration script must check its real target-side preconditions before changing anything. Only three introduction transitions ship here. Upgrade/removal scripts in tests are synthetic selection examples, not deployable migrations.
+A **transition** has an exact `from` module and `to` module for one interface. `null → module` introduces an instance, `module A → module B` changes its implementation, and `module → null` removes it. At least one endpoint must be non-null. Each transition has **its own directory and script**; scripts do not live in modules. The request explicitly names each transition and instance; the planner neither chooses one from a previous-state file nor keeps an execution log. `from: null` is a declaration of the intended operation, **not proof of absence on the target**. An old→new migration script must check its real target-side preconditions before changing anything. Only three introduction transitions ship here. Upgrade/removal scripts in tests are synthetic selection examples, not deployable migrations.
 
 ## Argument references
 
@@ -21,12 +21,12 @@ A **transition** has an exact `start` module and `end` module for one interface.
 
 ```json
 "args": [
-  {"side": "end", "name": "account_name"},
-  {"side": "end", "name": "shell_path"}
+  {"side": "to", "name": "account_name"},
+  {"side": "to", "name": "shell_path"}
 ]
 ```
 
-These are the positional arguments passed to that transition's `run.sh`, **not** runtime outputs. `side: "end"` reads the desired instance's declaration: `account_name` is the configured name and `shell_path` is a static value from the bound login-shell instance. The planner resolves both before contacting a target. A transition with a start module can use `side: "start"` to read the old module's declared values or explicitly provided start configuration/bindings in its **request**, not a recorded observation. The expanded plan retains source provenance.
+These are the positional arguments passed to that transition's `run.sh`, **not** runtime outputs. `side: "to"` reads the destination instance's declaration: `account_name` is the configured name and `shell_path` is a static value from the bound login-shell instance. The planner resolves both before contacting a target. A transition with a `from` module can use `side: "from"` to read that module's declared values or explicitly provided `from_inputs`/`from_bindings` in its **request**, not a recorded observation. The expanded plan retains source provenance.
 
 ## Inspect without contacting a target
 

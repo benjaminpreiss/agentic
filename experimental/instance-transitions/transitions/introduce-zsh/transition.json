@@ -1,8 +1,8 @@
 {
   "id": "introduce-zsh",
   "interface": "login-shell@1",
-  "start": null,
-  "end": "zsh-on-tumbleweed",
+  "from": null,
+  "to": "zsh-on-tumbleweed",
   "script": "run.sh",
-  "args": [{"side": "end", "name": "path"}]
+  "args": [{"side": "to", "name": "path"}]
 }

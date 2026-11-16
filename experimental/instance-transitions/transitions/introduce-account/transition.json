@@ -1,11 +1,11 @@
 {
   "id": "introduce-account",
   "interface": "account@1",
-  "start": null,
-  "end": "linux-local-account",
+  "from": null,
+  "to": "linux-local-account",
   "script": "run.sh",
   "args": [
-    {"side": "end", "name": "account_name"},
-    {"side": "end", "name": "shell_path"}
+    {"side": "to", "name": "account_name"},
+    {"side": "to", "name": "shell_path"}
   ]
 }

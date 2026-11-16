@@ -83,13 +83,13 @@ def load(root):
     transitions = documents(root / "transitions", "transition")
     keys = set()
     for name, transition in transitions.items():
-        start, end, interface = transition.get("start"), transition.get("end"), transition.get("interface")
-        if start is None and end is None:
-            raise ValueError(f"transition needs a start or end module: {name}")
+        source, destination, interface = transition.get("from"), transition.get("to"), transition.get("interface")
+        if source is None and destination is None:
+            raise ValueError(f"transition needs a from or to module: {name}")
         if (interface not in interfaces or any(m is not None and
-                (m not in modules or modules[m]["implements"] != interface) for m in (start, end))):
+                (m not in modules or modules[m]["implements"] != interface) for m in (source, destination))):
             raise ValueError(f"transition endpoint does not implement {interface}: {name}")
-        key = (interface, start, end)
+        key = (interface, source, destination)
         if key in keys:
             raise ValueError(f"ambiguous transition: {name}")
         keys.add(key)
@@ -101,8 +101,8 @@ def load(root):
             raise ValueError(f"invalid transition arguments: {name}")
         for arg in args:
             if (not isinstance(arg, dict) or set(arg) != {"side", "name"}
-                    or arg["side"] not in ("start", "end") or not isinstance(arg["name"], str)
-                    or not ARG.fullmatch(arg["name"]) or transition[arg["side"]] is None):
+                    or arg["side"] not in ("from", "to") or not isinstance(arg["name"], str)
+                    or not ARG.fullmatch(arg["name"]) or transition.get(arg["side"]) is None):
                 raise ValueError(f"invalid transition argument: {name}")
     return interfaces, modules, transitions
 
@@ -122,7 +122,7 @@ def read_requests(file, transitions):
     by_instance = {}
     for entry in requested:
         if (not isinstance(entry, dict) or not {"instance", "transition"}.issubset(entry)
-                or set(entry) - {"instance", "transition", "start_inputs", "start_bindings"}
+                or set(entry) - {"instance", "transition", "from_inputs", "from_bindings"}
                 or not isinstance(entry["instance"], str) or entry["instance"] in by_instance
                 or entry["transition"] not in transitions):
             raise ValueError("invalid or duplicate transition request")
@@ -189,37 +189,37 @@ def expand(root=ROOT, request_file=None):
     requests = read_requests(Path(request_file), transitions)
     if set(desired) != set(requests):
         raise ValueError("requests must explicitly name every desired instance")
-    starts = {}
+    sources = {}
     for name, entry in requests.items():
         transition = transitions[entry["transition"]]
-        if desired[name]["module"] != transition["end"]:
-            raise ValueError(f"requested transition end does not match desired module: {name}")
-        if transition["start"] is None and (entry.get("start_inputs") or entry.get("start_bindings")):
-            raise ValueError(f"absent start cannot have bindings or inputs: {name}")
-        starts[name] = {"module": transition["start"], "inputs": entry.get("start_inputs", {}),
-                        "bindings": entry.get("start_bindings", {})}
+        if desired[name]["module"] != transition.get("to"):
+            raise ValueError(f"requested transition to does not match desired module: {name}")
+        if transition.get("from") is None and (entry.get("from_inputs") or entry.get("from_bindings")):
+            raise ValueError(f"absent from cannot have bindings or inputs: {name}")
+        sources[name] = {"module": transition.get("from"), "inputs": entry.get("from_inputs", {}),
+                         "bindings": entry.get("from_bindings", {})}
 
     active = [n for n in desired if desired[n]["module"] is not None]
-    removed = [n for n in starts if starts[n]["module"] is not None and desired[n]["module"] is None]
-    ordered = order(active, desired) + list(reversed(order(removed, starts)))
+    removed = [n for n in sources if sources[n]["module"] is not None and desired[n]["module"] is None]
+    ordered = order(active, desired) + list(reversed(order(removed, sources)))
     plan = []
     for name in ordered:
         transition = transitions[requests[name]["transition"]]
-        before, after = transition["start"], transition["end"]
-        old = resolve(name, starts, modules, interfaces) if before is not None else None
+        before, after = transition.get("from"), transition.get("to")
+        old = resolve(name, sources, modules, interfaces) if before is not None else None
         new = resolve(name, desired, modules, interfaces) if after is not None else None
         interface = (new or old)["interface"]
         if interface != transition["interface"]:
             raise ValueError(f"requested transition interface mismatch: {name}")
         args = []
         for arg in transition["args"]:
-            endpoint = old if arg["side"] == "start" else new
+            endpoint = old if arg["side"] == "from" else new
             if arg["name"] not in endpoint["args"]:
                 raise ValueError(f"unknown transition argument: {transition['id']}.{arg['name']}")
             args.append({"value": endpoint["args"][arg["name"]]["value"], "source":
                         {"side": arg["side"], "detail": endpoint["args"][arg["name"]]["source"]}})
         plan.append({"instance": name, "transition": transition["id"], "interface": interface,
-                     "start": before, "end": after, "dependencies": list((new or old)["bindings"].values()),
+                     "from": before, "to": after, "dependencies": list((new or old)["bindings"].values()),
                      "script": f"transitions/{transition['id']}/run.sh", "args": args})
     return plan
 
@@ -235,7 +235,7 @@ def script(plan, root=ROOT):
         if marker in content:
             raise ValueError("transition script contains its here-document delimiter")
         args = " ".join(shlex.quote(arg["value"]) for arg in step["args"])
-        lines.extend([f"# {step['instance']}: {step['transition']} ({step['start']} -> {step['end']})",
+        lines.extend([f"# {step['instance']}: {step['transition']} ({step['from']} -> {step['to']})",
                       f"sh -s -- {args} <<'{marker}'", content, marker])
     return "\n".join(lines) + "\n"
 
