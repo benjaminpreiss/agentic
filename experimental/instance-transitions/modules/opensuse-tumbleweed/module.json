@@ -1,5 +1,5 @@
 {
-  "id": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1},
+  "kind": "module", "publisher": "did:web:agentic.invalid", "name": "opensuse-tumbleweed", "version": 1,
   "implements": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "os", "version": 1},
   "requires": [],
   "values": {},

@@ -1,5 +1,5 @@
 {
-  "id": {"kind": "module", "publisher": "did:web:agentic.invalid", "name": "linux-local-account", "version": 1},
+  "kind": "module", "publisher": "did:web:agentic.invalid", "name": "linux-local-account", "version": 1,
   "implements": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "account", "version": 1},
   "requires": [
     {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "os", "version": 1},

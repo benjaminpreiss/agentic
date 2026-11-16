@@ -24,6 +24,17 @@ def artifact_id(raw, kind):
     return (kind, raw["publisher"], raw["name"], raw["version"])
 
 
+def artifact_ref(doc):
+    """Use the same structured coordinate shape for references, without declaration fields."""
+    return {field: doc[field] for field in ("kind", "publisher", "name", "version")}
+
+
+def declaration_id(doc, kind):
+    if "id" in doc:
+        raise ValueError("artifact identity belongs at the declaration root")
+    return artifact_id({field: doc.get(field) for field in ID_FIELDS}, kind)
+
+
 def value_is(value, kind):
     if kind == "string":
         return isinstance(value, str)
@@ -36,9 +47,9 @@ def documents(root, kind):
     result = {}
     for file in sorted((root / (kind + "s")).rglob(kind + ".json")):
         doc = json.loads(file.read_text())
-        key = artifact_id(doc.get("id"), kind)
+        key = declaration_id(doc, kind)
         if key in result:
-            raise ValueError(f"duplicate artifact identity: {doc['id']}")
+            raise ValueError(f"duplicate artifact identity: {artifact_ref(doc)}")
         doc["_file"] = file.relative_to(root)
         result[key] = doc
     return result
@@ -48,7 +59,7 @@ def load(root):
     interfaces = {}
     for file in sorted((root / "interfaces").rglob("*.json")):
         doc = json.loads(file.read_text())
-        key = artifact_id(doc.get("id"), "interface")
+        key = declaration_id(doc, "interface")
         if key in interfaces or not isinstance(doc.get("values"), dict):
             raise ValueError(f"invalid or duplicate interface: {file}")
         for name, spec in doc["values"].items():
@@ -63,57 +74,57 @@ def load(root):
     for key, mod in modules.items():
         interface = artifact_id(mod.get("implements"), "interface")
         if interface not in interfaces or any(k in mod for k in ("transitions", "scripts", "entrypoint")):
-            raise ValueError(f"invalid module capabilities: {mod['id']}")
+            raise ValueError(f"invalid module capabilities: {artifact_ref(mod)}")
         required = mod.get("requires")
         if not isinstance(required, list):
-            raise ValueError(f"invalid required interfaces: {mod['id']}")
+            raise ValueError(f"invalid required interfaces: {artifact_ref(mod)}")
         required_ids = [artifact_id(i, "interface") for i in required]
         if len(set(required_ids)) != len(required_ids) or any(i not in interfaces for i in required_ids):
-            raise ValueError(f"invalid required interfaces: {mod['id']}")
+            raise ValueError(f"invalid required interfaces: {artifact_ref(mod)}")
         declared = mod.get("values")
         if not isinstance(declared, dict) or set(declared) != set(interfaces[interface]["values"]):
-            raise ValueError(f"incomplete provided values: {mod['id']}")
+            raise ValueError(f"incomplete provided values: {artifact_ref(mod)}")
         for name, value in declared.items():
             if not value_is(value, interfaces[interface]["values"][name]["type"]):
-                raise ValueError(f"invalid provided value: {mod['id']}.{name}")
+                raise ValueError(f"invalid provided value: {artifact_ref(mod)}.{name}")
         config, uses = mod.get("config", {}), mod.get("uses", [])
         if (not isinstance(config, dict) or any(not isinstance(k, str) or not ARG.fullmatch(k) or v != "string"
                 for k, v in config.items()) or not isinstance(uses, list)):
-            raise ValueError(f"invalid module config or uses: {mod['id']}")
+            raise ValueError(f"invalid module config or uses: {artifact_ref(mod)}")
         dests = set(config) | set(declared)
         for use in uses:
             if not isinstance(use, dict) or set(use) != {"interface", "value", "as"}:
-                raise ValueError(f"invalid module use: {mod['id']}")
+                raise ValueError(f"invalid module use: {artifact_ref(mod)}")
             source = artifact_id(use["interface"], "interface")
             if (source not in required_ids or use["value"] not in interfaces[source]["values"]
                     or not isinstance(use["as"], str) or not ARG.fullmatch(use["as"])
                     or use["as"] in dests):
-                raise ValueError(f"invalid module use: {mod['id']}")
+                raise ValueError(f"invalid module use: {artifact_ref(mod)}")
             dests.add(use["as"])
 
     transitions = documents(root, "transition")
     for key, transition in transitions.items():
         source, destination = transition.get("from"), transition.get("to")
         if source is None and destination is None:
-            raise ValueError(f"transition needs a from or to module: {transition['id']}")
+            raise ValueError(f"transition needs a from or to module: {artifact_ref(transition)}")
         interface = artifact_id(transition.get("interface"), "interface")
         if interface not in interfaces:
-            raise ValueError(f"unknown transition interface: {transition['id']}")
+            raise ValueError(f"unknown transition interface: {artifact_ref(transition)}")
         for endpoint in (source, destination):
             if endpoint is not None:
                 module_id = artifact_id(endpoint, "module")
                 if module_id not in modules or artifact_id(modules[module_id]["implements"], "interface") != interface:
-                    raise ValueError(f"transition endpoint does not implement interface: {transition['id']}")
+                    raise ValueError(f"transition endpoint does not implement interface: {artifact_ref(transition)}")
         if transition.get("script") != "run.sh" or not (root / transition["_file"].parent / "run.sh").is_file():
-            raise ValueError(f"missing transition script: {transition['id']}")
+            raise ValueError(f"missing transition script: {artifact_ref(transition)}")
         args = transition.get("args")
         if not isinstance(args, list):
-            raise ValueError(f"invalid transition arguments: {transition['id']}")
+            raise ValueError(f"invalid transition arguments: {artifact_ref(transition)}")
         for arg in args:
             if (not isinstance(arg, dict) or set(arg) != {"side", "name"}
                     or arg["side"] not in ("from", "to") or not isinstance(arg["name"], str)
                     or not ARG.fullmatch(arg["name"]) or transition.get(arg["side"]) is None):
-                raise ValueError(f"invalid transition argument: {transition['id']}")
+                raise ValueError(f"invalid transition argument: {artifact_ref(transition)}")
     return interfaces, modules, transitions
 
 
@@ -193,7 +204,7 @@ def resolve(name, entries, modules, interfaces):
         provider_module = modules[artifact_id(entries[provider]["module"], "module")]
         args[use["as"]] = {"value": provider_module["values"][value_name],
                            "source": {"interface": use["interface"], "instance": provider, "value": value_name}}
-    return {"module": mod["id"], "interface": mod["implements"], "bindings": bindings, "args": args}
+    return {"module": artifact_ref(mod), "interface": mod["implements"], "bindings": bindings, "args": args}
 
 
 def order(names, entries):
@@ -254,10 +265,10 @@ def expand(root=ROOT, request_file=None):
         for arg in transition["args"]:
             endpoint = old if arg["side"] == "from" else new
             if arg["name"] not in endpoint["args"]:
-                raise ValueError(f"unknown transition argument: {transition['id']}.{arg['name']}")
+                raise ValueError(f"unknown transition argument: {artifact_ref(transition)}.{arg['name']}")
             args.append({"value": endpoint["args"][arg["name"]]["value"], "source":
                         {"side": arg["side"], "detail": endpoint["args"][arg["name"]]["source"]}})
-        plan.append({"instance": name, "transition": transition["id"], "interface": interface,
+        plan.append({"instance": name, "transition": artifact_ref(transition), "interface": interface,
                      "from": before, "to": after, "dependencies": list((new or old)["bindings"].values()),
                      "script": str(transition["_file"].parent / "run.sh"), "args": args})
     return plan

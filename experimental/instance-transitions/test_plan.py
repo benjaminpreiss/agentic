@@ -27,8 +27,16 @@ class TransitionTests(unittest.TestCase):
         self.assertIn("sh -s -- agentic /usr/bin/zsh <<'AGENTIC_TRANSITION_2'", rendered)
         self.assertNotIn('ansible', rendered)
         self.assertNotIn('agentic', (ROOT / 'transitions/introduce-account/run.sh').read_text())
-        for file in (ROOT / 'modules').rglob('module.json'):
-            self.assertFalse({'script', 'transitions', 'entrypoint'} & set(json.loads(file.read_text())))
+        for directory, filename in (('modules', 'module.json'), ('transitions', 'transition.json'),
+                                    ('interfaces', '*.json')):
+            for file in (ROOT / directory).rglob(filename):
+                declaration = json.loads(file.read_text())
+                self.assertNotIn('id', declaration)
+                self.assertEqual(set(ref(declaration['kind'], declaration['name'],
+                                             declaration['version'], declaration['publisher'])),
+                                 {'kind', 'publisher', 'name', 'version'})
+                if directory == 'modules':
+                    self.assertFalse({'script', 'transitions', 'entrypoint'} & set(declaration))
 
     def test_two_accounts_share_module_and_provider_under_distinct_instance_ids(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -49,14 +57,14 @@ class TransitionTests(unittest.TestCase):
             old = root / 'modules/old-zsh'
             old.mkdir()
             (old / 'module.json').write_text(json.dumps({
-                'id': ref('module', 'legacy-zsh'),
+                **ref('module', 'legacy-zsh'),
                 'implements': ref('interface', 'login-shell'), 'requires': [],
                 'values': {'path': '/old/bin/zsh'}, 'config': {}, 'uses': []}))
             upgrade = root / 'transitions/upgrade-zsh'
             upgrade.mkdir()
             (upgrade / 'run.sh').write_text('#!/bin/sh\nexit 0\n')
             (upgrade / 'transition.json').write_text(json.dumps({
-                'id': ref('transition', 'upgrade-zsh'), 'interface': ref('interface', 'login-shell'),
+                **ref('transition', 'upgrade-zsh'), 'interface': ref('interface', 'login-shell'),
                 'from': ref('module', 'legacy-zsh'), 'to': ref('module', 'zsh-on-tumbleweed'),
                 'script': 'run.sh', 'args': [{'side': 'from', 'name': 'path'}, {'side': 'to', 'name': 'path'}]}))
             requests = self.requests(root)
@@ -85,7 +93,7 @@ class TransitionTests(unittest.TestCase):
                 folder.mkdir()
                 (folder / 'run.sh').write_text('#!/bin/sh\nexit 0\n')
                 (folder / 'transition.json').write_text(json.dumps({
-                    'id': ref('transition', 'remove-' + suffix), 'interface': ref('interface', iface),
+                    **ref('transition', 'remove-' + suffix), 'interface': ref('interface', iface),
                     'from': ref('module', module), 'to': None, 'script': 'run.sh', 'args': args}))
             steps = expand(root, self.save_requests(root, requests))
             self.assertEqual([s['instance'] for s in steps], ['agentic', 'interactive', 'host'])
@@ -110,11 +118,11 @@ class TransitionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'duplicate artifact identity'):
                 expand(root)
             other = json.loads((duplicate / 'module.json').read_text())
-            other['id']['publisher'] = 'did:web:other.invalid'
+            other['publisher'] = 'did:web:other.invalid'
             (duplicate / 'module.json').write_text(json.dumps(other))
             self.assertEqual(expand(root)[0]['to'], ref('module', 'opensuse-tumbleweed'))
-            other['id']['publisher'] = PUBLISHER
-            other['id']['version'] = 2
+            other['publisher'] = PUBLISHER
+            other['version'] = 2
             (duplicate / 'module.json').write_text(json.dumps(other))
             self.assertEqual(expand(root)[0]['to'], ref('module', 'opensuse-tumbleweed'))
 
@@ -125,7 +133,7 @@ class TransitionTests(unittest.TestCase):
             folder.mkdir()
             shutil.copy(root / 'transitions/introduce-os/run.sh', folder / 'run.sh')
             spec = json.loads((root / 'transitions/introduce-os/transition.json').read_text())
-            spec['id'] = ref('transition', 'alternative-os')
+            spec['name'] = 'alternative-os'
             (folder / 'transition.json').write_text(json.dumps(spec))
             requests = self.requests(root)
             requests['transitions'][0]['transition'] = ref('transition', 'alternative-os')
@@ -150,7 +158,7 @@ class TransitionTests(unittest.TestCase):
             folder.mkdir()
             (folder / 'run.sh').write_text('exit 0\n')
             (folder / 'transition.json').write_text(json.dumps({
-                'id': ref('transition', 'invalid'), 'interface': ref('interface', 'account'),
+                **ref('transition', 'invalid'), 'interface': ref('interface', 'account'),
                 'from': None, 'to': None, 'script': 'run.sh', 'args': []}))
             with self.assertRaisesRegex(ValueError, 'needs a from or to module'):
                 expand(root)

@@ -13,10 +13,16 @@ transitions/introduce-account/{transition.json,run.sh}
 plan.py                                validates requests, resolves arguments, orders dependencies
 ```
 
-Every interface, module and transition declares a structured artifact identity, and references use the same shape:
+Every interface, module and transition declares its artifact identity **at the document root**, rather than under an `id` wrapper. References use the same four fields as a structured value:
 
 ```json
-{"kind": "module", "publisher": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1}
+{
+  "kind": "module",
+  "publisher": "did:web:agentic.invalid",
+  "name": "linux-local-account",
+  "version": 1,
+  "implements": {"kind": "interface", "publisher": "did:web:agentic.invalid", "name": "account", "version": 1}
+}
 ```
 
 `kind` distinguishes artifact categories; `publisher` is an opaque **claimed DID**; `name` is local to that publisher and kind; `version` is a positive artifact revision, independent of PostgreSQL or other installed software versions. The planner rejects duplicate coordinates within its loaded artifact set and validates the kind of each reference. Artifact file paths do not define identity, so different versions can coexist. `did:web:agentic.invalid` is an intentionally **unresolvable fixture**, not a verified publisher. No DID resolution, signature, authorization, canonical-byte packaging or historical immutability enforcement exists here. A future publication process must prevent republishing changed bytes under the same coordinate; an identifier alone cannot establish trust or globally prevent an imposter from claiming a publisher. Instance IDs such as `agentic` remain stable and deployment-scoped, not versioned artifact IDs.
