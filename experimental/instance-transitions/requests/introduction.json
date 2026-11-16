@@ -1,0 +1,7 @@
+{
+  "transitions": [
+    {"instance": "host", "transition": "introduce-os"},
+    {"instance": "interactive", "transition": "introduce-zsh"},
+    {"instance": "agentic", "transition": "introduce-account"}
+  ]
+}

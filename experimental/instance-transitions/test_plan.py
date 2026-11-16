@@ -7,7 +7,7 @@ from plan import ROOT, expand, script
 
 
 class TransitionTests(unittest.TestCase):
-    def test_introduction_uses_static_shell_value_and_bound_instances(self):
+    def test_explicit_introduction_uses_static_shell_value_and_bound_instances(self):
         steps = expand()
         self.assertEqual([step['transition'] for step in steps],
                          ['introduce-os', 'introduce-zsh', 'introduce-account'])
@@ -25,23 +25,22 @@ class TransitionTests(unittest.TestCase):
         for file in (ROOT / 'modules').glob('*/module.json'):
             self.assertFalse({'script', 'transitions', 'entrypoint'} & set(json.loads(file.read_text())))
 
-    def test_two_accounts_share_module_and_provider_but_have_separate_transitions(self):
+    def test_two_accounts_share_module_and_provider_but_request_separate_transitions(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
             (root / 'instances/reviewer.json').write_text(json.dumps({
                 'id': 'reviewer', 'module': 'linux-local-account',
                 'bindings': {'os@1': 'host', 'login-shell@1': 'interactive'},
                 'inputs': {'account_name': 'reviewer'}}))
-            state = json.loads((root / 'state/absent.json').read_text())
-            state['instances']['reviewer'] = {'module': None}
-            previous = root / 'state/with-reviewer.json'
-            previous.write_text(json.dumps(state))
-            steps = expand(root, previous)
+            requests = self.read_requests(root)
+            requests['transitions'].append({'instance': 'reviewer', 'transition': 'introduce-account'})
+            requested = self.save_requests(root, requests)
+            steps = expand(root, requested)
             self.assertEqual([step['instance'] for step in steps], ['host', 'interactive', 'agentic', 'reviewer'])
             self.assertEqual(steps[-1]['transition'], 'introduce-account')
             self.assertEqual([arg['value'] for arg in steps[-1]['args']], ['reviewer', '/usr/bin/zsh'])
 
-    def test_explicit_upgrade_uses_old_and_new_module_values(self):
+    def test_explicit_upgrade_uses_start_and_end_module_declarations(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
             old = root / 'modules/old-zsh'
@@ -56,25 +55,23 @@ class TransitionTests(unittest.TestCase):
                 'id': 'upgrade-zsh', 'interface': 'login-shell@1',
                 'start': 'old-zsh', 'end': 'zsh-on-tumbleweed', 'script': 'run.sh',
                 'args': [{'side': 'start', 'name': 'path'}, {'side': 'end', 'name': 'path'}]}))
-            state = json.loads((root / 'state/absent.json').read_text())
-            state['instances']['interactive'] = {'module': 'old-zsh', 'bindings': {}, 'inputs': {}}
-            previous = root / 'state/upgrade.json'
-            previous.write_text(json.dumps(state))
-            steps = expand(root, previous)
+            requests = self.read_requests(root)
+            requests['transitions'][1] = {'instance': 'interactive', 'transition': 'upgrade-zsh'}
+            steps = expand(root, self.save_requests(root, requests))
             self.assertEqual(steps[1]['transition'], 'upgrade-zsh')
             self.assertEqual([arg['value'] for arg in steps[1]['args']], ['/old/bin/zsh', '/usr/bin/zsh'])
             self.assertEqual(steps[2]['args'][1]['value'], '/usr/bin/zsh')
 
-    def test_removal_orders_dependents_before_providers_and_reads_start(self):
+    def test_removal_orders_dependents_before_providers_and_reads_start_declarations(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
-            prior = {'instances': {}}
+            requests = {'transitions': []}
             for file in (root / 'instances').glob('*.json'):
                 entry = json.loads(file.read_text())
-                prior['instances'][entry['id']] = {k: entry[k] for k in ('module', 'bindings', 'inputs')}
+                suffix = {'host': 'os', 'interactive': 'zsh', 'agentic': 'account'}[entry['id']]
+                requests['transitions'].append({'instance': entry['id'], 'transition': 'remove-' + suffix,
+                    'start_inputs': entry['inputs'], 'start_bindings': entry['bindings']})
                 file.write_text(json.dumps({'id': entry['id'], 'module': None}))
-            previous = root / 'state/deployed.json'
-            previous.write_text(json.dumps(prior))
             for interface, module, suffix, args in (
                 ('account@1', 'linux-local-account', 'account', [{'side': 'start', 'name': 'shell_path'}]),
                 ('login-shell@1', 'zsh-on-tumbleweed', 'zsh', []),
@@ -86,23 +83,24 @@ class TransitionTests(unittest.TestCase):
                 (folder / 'transition.json').write_text(json.dumps({
                     'id': 'remove-' + suffix, 'interface': interface, 'start': module,
                     'end': None, 'script': 'run.sh', 'args': args}))
-            steps = expand(root, previous)
+            steps = expand(root, self.save_requests(root, requests))
             self.assertEqual([step['instance'] for step in steps], ['agentic', 'interactive', 'host'])
             self.assertEqual(steps[0]['args'][0]['value'], '/usr/bin/zsh')
 
-    def test_missing_transition_or_incomplete_previous_state_fails_closed(self):
+    def test_missing_or_mismatched_request_fails_without_inferring_a_transition(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
-            incomplete = root / 'state/incomplete.json'
-            incomplete.write_text(json.dumps({'instances': {'host': {'module': None}}}))
+            requests = self.read_requests(root)
+            requests['transitions'].pop()
             with self.assertRaisesRegex(ValueError, 'explicitly name every'):
-                expand(root, incomplete)
-            previous = root / 'state/existing.json'
-            state = json.loads((root / 'state/absent.json').read_text())
-            state['instances']['host'] = {'module': 'opensuse-tumbleweed', 'bindings': {}, 'inputs': {}}
-            previous.write_text(json.dumps(state))
-            with self.assertRaisesRegex(ValueError, 'no explicit transition.*opensuse-tumbleweed -> opensuse-tumbleweed'):
-                expand(root, previous)
+                expand(root, self.save_requests(root, requests))
+            requests['transitions'].append({'instance': 'agentic', 'transition': 'introduce-zsh'})
+            with self.assertRaisesRegex(ValueError, 'requested transition end does not match'):
+                expand(root, self.save_requests(root, requests))
+            requests['transitions'][-1]['transition'] = 'introduce-account'
+            requests['transitions'][-1]['start_inputs'] = {'account_name': 'agentic'}
+            with self.assertRaisesRegex(ValueError, 'absent start cannot'):
+                expand(root, self.save_requests(root, requests))
             invalid = root / 'transitions/invalid'
             invalid.mkdir()
             (invalid / 'run.sh').write_text('exit 0\n')
@@ -129,8 +127,18 @@ class TransitionTests(unittest.TestCase):
                 expand(root)
 
     @staticmethod
+    def read_requests(root):
+        return json.loads((root / 'requests/introduction.json').read_text())
+
+    @staticmethod
+    def save_requests(root, requests):
+        file = root / 'requests/test.generated.json'
+        file.write_text(json.dumps(requests))
+        return file
+
+    @staticmethod
     def copy_model(root):
-        for name in ('interfaces', 'modules', 'instances', 'transitions', 'state'):
+        for name in ('interfaces', 'modules', 'instances', 'transitions', 'requests'):
             shutil.copytree(ROOT / name, root / name)
         return root
 

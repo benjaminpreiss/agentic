@@ -1,21 +1,32 @@
 # Independent draft: module instances and separate deployment transitions
 
-**Question:** Can modules declare only interface capabilities and static information while independent transitions move an instance between module implementations? This experiment starts from `main`; it does **not** modify [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. Its JSON is the canonical representation; a typed authoring language could emit the same documents later.
+**Question:** Can modules declare only interface capabilities and static information while independent transitions bring instances into use? This experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later.
 
 ```text
-interfaces/{os,login-shell,account}.v1.json  concepts and static value types, no ensure
-modules/*/module.json                   implementations, values and required interfaces, no scripts
+interfaces/{os,login-shell,account}.v1.json  conceptual contracts and static value types
+modules/*/module.json                   implementations, values and required interfaces; no scripts
 instances/*.json                       desired configured instances and provider bindings
-state/absent.json                      explicit *claimed* previously applied modules
+requests/introduction.json             explicit transitions to run for those instances
 transitions/introduce-os/{transition.json,run.sh}
 transitions/introduce-zsh/{transition.json,run.sh}
 transitions/introduce-account/{transition.json,run.sh}
-plan.py                                selects and orders transitions, renders a shell script
+plan.py                                validates requests, resolves arguments, orders dependencies
 ```
 
-A **transition** has an exact `start` module and `end` module for one interface. `null → module` introduces an instance, `module → null` removes one, and `module A → module B` changes its implementation (e.g. PostgreSQL 12 → 14). At least one endpoint is required. Each transition has **its own directory and script**; scripts do not belong to modules. This draft ships only three introduction transitions. Tests create *test-only* upgrade/removal transitions to exercise the selector; they are not production upgrade or removal scripts. Transitions can read static values, instance configuration and values from bound provider instances on their start or end side. `introduce-account` receives both `account_name` and the path supplied by its bound Zsh instance, `/usr/bin/zsh`, before execution.
+A **transition** has an exact `start` module and `end` module for one interface. `null → module` introduces an instance, `module A → module B` changes its implementation, and `module → null` removes it. At least one endpoint must be non-null. Each transition has **its own directory and script**; scripts do not live in modules. The request explicitly names each transition and instance; the planner neither chooses one from a previous-state file nor keeps an execution log. `start: null` is a declaration of the intended operation, **not proof of absence on the target**. An old→new migration script must check its real target-side preconditions before changing anything. Only three introduction transitions ship here. Upgrade/removal scripts in tests are synthetic selection examples, not deployable migrations.
 
-Planning requires an **explicit previous-state record**; it never infers absence or discovers target state. An entry must exist for every desired instance, including one with `module: null`. A known pair without an explicit matching transition fails closed: even rerunning with unchanged modules requires a deliberate `A → A` reconcile transition (not provided). A real applied-state ledger, immutable module identities, target checks, transactions and recovery remain open design questions. Do not treat `state/absent.json` as a discovery result or use it on an existing machine.
+## Argument references
+
+`transitions/introduce-account/transition.json` includes:
+
+```json
+"args": [
+  {"side": "end", "name": "account_name"},
+  {"side": "end", "name": "shell_path"}
+]
+```
+
+These are the positional arguments passed to that transition's `run.sh`, **not** runtime outputs. `side: "end"` reads the desired instance's declaration: `account_name` is the configured name and `shell_path` is a static value from the bound login-shell instance. The planner resolves both before contacting a target. A transition with a start module can use `side: "start"` to read the old module's declared values or explicitly provided start configuration/bindings in its **request**, not a recorded observation. The expanded plan retains source provenance.
 
 ## Inspect without contacting a target
 
@@ -24,16 +35,16 @@ From this directory:
 ```bash
 cd experimental/instance-transitions
 python3 -m unittest discover -s . -p 'test_*.py'
-python3 plan.py --from state/absent.json --expand
-python3 plan.py --from state/absent.json --script > introduction.generated.sh
+python3 plan.py --requests requests/introduction.json --expand
+python3 plan.py --requests requests/introduction.json --script > introduction.generated.sh
 sh -n introduction.generated.sh
 ```
 
-The expanded JSON shows each transition's endpoints, bindings, script path, resolved argument values and their source. The OS, Zsh, and account scripts are moved under their respective introduction transition folders. The Zsh transition installs and verifies **the declared path**; it does not discover a path for substitution. The account transition uses a Linux-local account script (no hard-coded `agentic` or Zsh path). No Ansible is used.
+The generated script orders the OS, Zsh, and account introductions by instance bindings. Zsh installs and verifies its **declared** `/usr/bin/zsh` path; it does not discover a value for substitution. The reusable Linux account module contains neither `agentic` nor a shell path. No Ansible is used.
 
 ## Execution: not validated
 
-The generated script installs Zsh and may create a local account. **Only on a newly installed disposable Tumbleweed VM**, after a snapshot and verification of out-of-band console access, inspect the script and run it manually:
+The generated script installs Zsh and may create a local account. **Only on a newly installed disposable Tumbleweed VM**, after a snapshot and verification of out-of-band console access, inspect it and run it manually:
 
 ```bash
 ssh -T -i /private/path/to/key vm-user@disposable-vm \
@@ -41,4 +52,4 @@ ssh -T -i /private/path/to/key vm-user@disposable-vm \
   < introduction.generated.sh
 ```
 
-**Do not run it on the development host.** The flags are human attestations, not proof of disposability; the first script checks Tumbleweed identity before mutation. There has been **no VM run, multi-distribution validation, shellcheck, migration execution or Ansible syntax check**. A script may fail partway through; the planner does not record progress or automatically update applied state. A script's successful exit must not be interpreted as proof of an atomic transition. Do not commit secrets or generated scripts.
+**Do not run it on the development host.** The flags are human attestations, not proof of disposability; the first script checks Tumbleweed identity before mutation. There has been **no VM run, multi-distribution validation, shellcheck, migration execution or Ansible syntax check**. The planner does not record executions or know what might have changed outside it. A script may fail partway through; the generated script does not recover or roll back. Do not commit secrets or generated scripts.

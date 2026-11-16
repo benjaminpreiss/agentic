@@ -16,6 +16,11 @@ A module selected, configured and bound to other instances in one desired deploy
 **Transition**:
 An explicit deployment operation that changes one instance from a start module to an end module. Either endpoint can be absent, but not both.
 
-**Applied state**:
-The recorded module and bindings previously applied for each instance; it is a planning claim, not an observation proving the target is healthy.
-_Avoid_: Discovered state
+**Transition request**:
+An explicit choice of which transition to run for an instance. It is an intention, not evidence that its start condition holds on the target.
+
+**Start module**:
+The implementation a transition expects to replace or remove, if any. A missing start module does not prove the target is empty.
+
+**End module**:
+The implementation the transition intends to bring into use, if any. A missing end module denotes removal.

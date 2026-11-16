@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Select explicit JSON transitions between recorded and desired module instances."""
+"""Expand explicitly requested transitions between declared module endpoints."""
 import json
 import re
 import shlex
@@ -115,12 +115,19 @@ def read_desired(root):
     return desired
 
 
-def read_previous(file):
-    previous = json.loads(file.read_text())["instances"]
-    if not isinstance(previous, dict) or any(not isinstance(entry, dict) or "module" not in entry
-                                              for entry in previous.values()):
-        raise ValueError("invalid previous deployment record")
-    return previous
+def read_requests(file, transitions):
+    requested = json.loads(file.read_text())["transitions"]
+    if not isinstance(requested, list):
+        raise ValueError("invalid transition requests")
+    by_instance = {}
+    for entry in requested:
+        if (not isinstance(entry, dict) or not {"instance", "transition"}.issubset(entry)
+                or set(entry) - {"instance", "transition", "start_inputs", "start_bindings"}
+                or not isinstance(entry["instance"], str) or entry["instance"] in by_instance
+                or entry["transition"] not in transitions):
+            raise ValueError("invalid or duplicate transition request")
+        by_instance[entry["instance"]] = entry
+    return by_instance
 
 
 def resolve(name, entries, modules, interfaces):
@@ -173,33 +180,37 @@ def order(names, entries):
     return ordered
 
 
-def expand(root=ROOT, previous_file=None):
-    """Select exact start→end transitions using an explicit previous-state record."""
-    if previous_file is None:
-        previous_file = root / "state" / "absent.json"
+def expand(root=ROOT, request_file=None):
+    """Resolve explicit transition requests; no execution history or target observation."""
+    if request_file is None:
+        request_file = root / "requests" / "introduction.json"
     interfaces, modules, transitions = load(root)
-    desired, previous = read_desired(root), read_previous(Path(previous_file))
-    if set(desired) != set(previous):
-        raise ValueError("previous record must explicitly name every desired instance, including absent ones")
-    for name in previous:
-        if previous[name]["module"] is not None and previous[name]["module"] not in modules:
-            raise ValueError(f"previous module declaration unavailable: {name}")
-        if desired[name]["module"] is not None and desired[name]["module"] not in modules:
-            raise ValueError(f"unknown desired module: {name}")
+    desired = read_desired(root)
+    requests = read_requests(Path(request_file), transitions)
+    if set(desired) != set(requests):
+        raise ValueError("requests must explicitly name every desired instance")
+    starts = {}
+    for name, entry in requests.items():
+        transition = transitions[entry["transition"]]
+        if desired[name]["module"] != transition["end"]:
+            raise ValueError(f"requested transition end does not match desired module: {name}")
+        if transition["start"] is None and (entry.get("start_inputs") or entry.get("start_bindings")):
+            raise ValueError(f"absent start cannot have bindings or inputs: {name}")
+        starts[name] = {"module": transition["start"], "inputs": entry.get("start_inputs", {}),
+                        "bindings": entry.get("start_bindings", {})}
 
     active = [n for n in desired if desired[n]["module"] is not None]
-    removed = [n for n in previous if previous[n]["module"] is not None and desired[n]["module"] is None]
-    ordered = order(active, desired) + list(reversed(order(removed, previous)))
-    index = {(t["interface"], t["start"], t["end"]): t for t in transitions.values()}
+    removed = [n for n in starts if starts[n]["module"] is not None and desired[n]["module"] is None]
+    ordered = order(active, desired) + list(reversed(order(removed, starts)))
     plan = []
     for name in ordered:
-        before, after = previous[name]["module"], desired[name]["module"]
-        old = resolve(name, previous, modules, interfaces) if before is not None else None
+        transition = transitions[requests[name]["transition"]]
+        before, after = transition["start"], transition["end"]
+        old = resolve(name, starts, modules, interfaces) if before is not None else None
         new = resolve(name, desired, modules, interfaces) if after is not None else None
         interface = (new or old)["interface"]
-        transition = index.get((interface, before, after))
-        if transition is None:
-            raise ValueError(f"no explicit transition for {name}: {before} -> {after}")
+        if interface != transition["interface"]:
+            raise ValueError(f"requested transition interface mismatch: {name}")
         args = []
         for arg in transition["args"]:
             endpoint = old if arg["side"] == "start" else new
@@ -214,7 +225,7 @@ def expand(root=ROOT, previous_file=None):
 
 
 def script(plan, root=ROOT):
-    """Render selected transitions; does not touch the target or update applied state."""
+    """Render requested transitions; does not touch the target or record executions."""
     lines = ["#!/bin/sh", "set -eu",
              "[ \"${AGENTIC_DISPOSABLE_VM:-}\" = true ] && [ \"${AGENTIC_CONSOLE_VERIFIED:-}\" = true ] || { echo 'Disposable VM and console confirmation required' >&2; exit 1; }",
              "[ \"$(id -u)\" -eq 0 ] || { echo 'Run as root on the target' >&2; exit 1; }"]
@@ -231,9 +242,9 @@ def script(plan, root=ROOT):
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) != 4 or sys.argv[1] != "--from" or sys.argv[3] not in ("--expand", "--script"):
-            raise ValueError("usage: plan.py --from state/absent.json [--expand | --script]")
-        planned = expand(previous_file=Path(sys.argv[2]))
+        if len(sys.argv) != 4 or sys.argv[1] != "--requests" or sys.argv[3] not in ("--expand", "--script"):
+            raise ValueError("usage: plan.py --requests requests/introduction.json [--expand | --script]")
+        planned = expand(request_file=Path(sys.argv[2]))
         if sys.argv[3] == "--expand":
             print(json.dumps(planned, indent=2))
         else:
