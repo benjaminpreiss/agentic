@@ -1,6 +1,6 @@
 # Independent draft: module instances and separate deployment transitions
 
-**Question:** Can modules declare only interface capabilities and static information while independent transitions bring instances into use? This experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact declarations use `(kind, authority, name, version)` coordinates; references have a compact string syntax.
+**Question:** Can modules declare interface capabilities and static information while independent transitions bring instances into use? This runnable subset has **values but no instance methods** yet. [CURRENT-REPO-MAP.md](CURRENT-REPO-MAP.md) maps the supported NixOS repository to the broader interface/module/instance/transition/method model without claiming support in this experiment. The experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact declarations use `(kind, authority, name, version)` coordinates; references have a compact string syntax.
 
 ```text
 interfaces/{os,login-shell,account}.v1.json  conceptual contracts and static value types
