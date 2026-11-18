@@ -114,6 +114,17 @@ class TransitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
             shutil.copytree(example, root / 'examples/networkd')
+            python_file = root / 'modules/tumbleweed-python3/module.json'
+            python_module = json.loads(python_file.read_text())
+            python_module['values']['path'] = '/opt/agentic/python/bin/python3'
+            python_file.write_text(json.dumps(python_module))
+            alternative = expand(root, root / 'examples/networkd/requests/introduction.json',
+                                 root / 'examples/networkd/instances')
+            self.assertEqual(alternative[2]['calls'][-1]['args'], ['/opt/agentic/python/bin/python3'])
+            self.assertEqual(alternative[3]['calls'][1]['args'], ['/opt/agentic/python/bin/python3'])
+            self.assertEqual(alternative[3]['calls'][-1]['args'][0], '/opt/agentic/python/bin/python3')
+            self.assertNotIn('/usr/bin/python3',
+                             (root / 'modules/tumbleweed-networkd/methods/configure.sh').read_text())
             network_file = root / 'examples/networkd/instances/network.json'
             network = json.loads(network_file.read_text())
             network['bindings'].pop()

@@ -4,9 +4,8 @@ set -eu
 [ "$#" -eq 7 ] || { echo 'expected interpreter, interface, MAC, mode, CIDR, gateway, DNS list' >&2; exit 2; }
 python_path=$1
 shift
-[ "$python_path" = /usr/bin/python3 ] && [ -x "$python_path" ] || {
-  echo 'Bound Python 3 interpreter unavailable' >&2; exit 1;
-}
+case "$python_path" in /*) ;; *) echo 'Bound interpreter path must be absolute' >&2; exit 1 ;; esac
+[ -x "$python_path" ] || { echo 'Bound Python 3 interpreter unavailable' >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || { echo 'Must run as root' >&2; exit 1; }
 [ "${AGENTIC_DISPOSABLE_VM:-}" = true ] && [ "${AGENTIC_CONSOLE_VERIFIED:-}" = true ] || {
   echo 'Only stage on a disposable VM with verified console access' >&2; exit 1;
