@@ -1,0 +1,1 @@
+{"id":"workspace","module":"did:web:agentic.invalid#module/tumbleweed-workspace@1","target":"vm","inputs":{"home":"/home/agentic/work"},"bindings":{"did:web:agentic.invalid#interface/bash-runtime@1":"bash-agent"}}

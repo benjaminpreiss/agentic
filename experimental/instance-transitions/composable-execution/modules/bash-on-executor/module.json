@@ -1,0 +1,1 @@
+{"kind":"module","authority":"did:web:agentic.invalid","name":"bash-on-executor","version":1,"implements":"interface/bash-runtime@1","requires":["interface/executor@1"],"methods":{"run":{"implementation":"delegate","via":"interface/executor@1"}},"executable":"/usr/bin/bash","accepts":["text/x-bash"]}

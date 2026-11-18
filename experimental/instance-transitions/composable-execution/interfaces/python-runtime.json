@@ -1,0 +1,1 @@
+{"kind":"interface","authority":"did:web:agentic.invalid","name":"python-runtime","version":1,"requires":["interface/executor@1"],"methods":{"run":{"guarantee":"Runs a reviewed Python artifact through its bound executor, not through the planner's interpreter."}}}

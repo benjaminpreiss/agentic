@@ -1,0 +1,1 @@
+{"kind":"interface","authority":"did:web:agentic.invalid","name":"executor","version":1,"requires":[],"methods":{"invoke":{"guarantee":"Invokes only an authorized reviewed artifact on the selected target; the external adapter must enforce authority and return an observation."}}}

@@ -1,0 +1,1 @@
+{"kind":"module","authority":"did:web:agentic.invalid","name":"external-executor","version":1,"implements":"interface/executor@1","requires":[],"methods":{"invoke":{"implementation":"external"}},"driver":"externally supplied, not implemented by this prototype"}

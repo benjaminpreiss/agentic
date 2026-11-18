@@ -22,6 +22,15 @@ An implementation of one interface that declares its values, configuration and r
 **Instance method**:
 An operation defined by an interface and implemented by a module, invoked on a configured instance. Its effect or observation is specific to the invocation; it does not promise lasting target conditions.
 
+**Runtime**:
+A capability for invoking a particular kind of reviewed implementation artifact. A runtime instance binds to an executor; using a runtime does not itself grant authority.
+
+**Executor**:
+The capability that invokes a reviewed artifact on a target under its authorized conditions. An initial executor must be supplied from outside a deployment's dependency graph.
+
+**Execution context**:
+The target and authority selected by an instance's bound runtime and executor instances for a method call, rather than a user name prescribed by the interface.
+
 **Instance**:
 A module selected, configured and bound to other instances in one desired deployment.
 
