@@ -8,12 +8,12 @@
     "interface/bash-runtime@1"
   ],
   "methods": {
-    "install_python3": {
+    "install": {
       "runtime": "interface/bash-runtime@1",
-      "artifact": "methods/install-python3.sh",
+      "artifact": "methods/install.sh",
       "format": "text/x-bash",
       "grant": "package-install",
-      "args": []
+      "args": ["package"]
     }
   }
 }

@@ -46,6 +46,13 @@ def catalog(root):
         methods = interface.get("methods")
         if not isinstance(methods, dict) or any(not isinstance(name, str) or not METHOD.fullmatch(name) for name in methods):
             raise ValueError(f"invalid interface methods: {key}")
+        for name, contract in methods.items():
+            if not isinstance(contract, dict):
+                raise ValueError(f"invalid interface method contract: {key}.{name}")
+            params = contract.get("params", [])
+            if (not isinstance(params, list) or any(not isinstance(p, str) or not METHOD.fullmatch(p)
+                                                     for p in params) or len(set(params)) != len(params)):
+                raise ValueError(f"invalid interface method parameters: {key}.{name}")
     for key, module in modules.items():
         implemented = reference(module.get("implements"), "interface", module["authority"])
         if implemented not in interfaces:
@@ -74,9 +81,12 @@ def catalog(root):
             if set(spec) != {"runtime", "artifact", "format", "grant", "args"}:
                 raise ValueError(f"invalid method implementation: {key}.{name}")
             runtime = reference(spec.get("runtime"), "interface", module["authority"])
+            params = interfaces[implemented]["methods"][name].get("params", [])
             if (runtime not in required or not isinstance(spec.get("grant"), str) or not spec["grant"]
                     or not isinstance(spec.get("args"), list) or any(
-                        not isinstance(arg, str) or not METHOD.fullmatch(arg) for arg in spec["args"])):
+                        not isinstance(arg, str) or not METHOD.fullmatch(arg) for arg in spec["args"])
+                    or len(set(spec["args"])) != len(spec["args"])
+                    or not set(params).issubset(spec["args"])):
                 raise ValueError(f"unbound runtime or grant: {key}.{name}")
             relative = spec.get("artifact")
             if (not isinstance(relative, str) or not re.fullmatch(r"methods/[a-z][a-z0-9_.-]*", relative)
@@ -98,8 +108,10 @@ def catalog(root):
                                                     modules[source]["authority"]) != declared_interface):
                 raise ValueError(f"invalid transition source: {key}")
         for call in transition["operations"]:
-            if (not isinstance(call, dict) or set(call) != {"instance", "method"}
-                    or not isinstance(call["instance"], str) or not isinstance(call["method"], str)):
+            if (not isinstance(call, dict) or not {"instance", "method"}.issubset(call)
+                    or set(call) - {"instance", "method", "args"}
+                    or not isinstance(call["instance"], str) or not isinstance(call["method"], str)
+                    or not isinstance(call.get("args", {}), dict)):
                 raise ValueError(f"invalid transition call: {key}")
     return result
 
@@ -193,6 +205,12 @@ def expand(root=ROOT):
             method = receiver["_module"]["methods"].get(operation["method"])
             if method is None or method.get("implementation") in ("external", "delegate"):
                 raise ValueError(f"unknown or non-artifact instance method: {receiver_name}.{operation['method']}")
+            interface_key = reference(receiver["_module"]["implements"], "interface",
+                                      receiver["_module"]["authority"])
+            params = docs["interface"][interface_key]["methods"][operation["method"]].get("params", [])
+            supplied = operation.get("args", {})
+            if set(supplied) != set(params) or any(not isinstance(value, str) for value in supplied.values()):
+                raise ValueError(f"invalid method call arguments: {receiver_name}.{operation['method']}")
             runtime_iface = reference(method["runtime"], "interface", receiver["_module"]["authority"])
             if runtime_iface not in receiver["_bindings"]:
                 raise ValueError(f"method runtime not bound: {receiver_name}.{operation['method']}")
@@ -209,11 +227,13 @@ def expand(root=ROOT):
                     or method["grant"] not in executor.get("grants", [])):
                 raise ValueError(f"unauthorized or cross-target invocation: {receiver_name}.{operation['method']}")
             inputs = receiver.get("inputs", {})
-            if not isinstance(inputs, dict) or any(arg not in inputs or not isinstance(inputs[arg], str)
-                                                    for arg in method["args"]):
+            if (not isinstance(inputs, dict) or any(arg not in inputs and arg not in supplied
+                                                    for arg in method["args"])
+                    or any(not isinstance((supplied if arg in supplied else inputs)[arg], str)
+                           for arg in method["args"])):
                 raise ValueError(f"missing or invalid method inputs: {receiver_name}.{operation['method']}")
             calls.append({"receiver": receiver_name, "method": operation["method"],
-                          "args": [inputs[arg] for arg in method["args"]],
+                          "args": [(supplied if arg in supplied else inputs)[arg] for arg in method["args"]],
                           "artifact": str(receiver["_module"]["_file"].parent / method["artifact"]),
                           "runtime": runtime_name, "format": method["format"],
                           "executable": runtime["_module"].get("executable"),

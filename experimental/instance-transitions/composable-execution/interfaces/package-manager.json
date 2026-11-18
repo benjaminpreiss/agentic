@@ -5,6 +5,6 @@
   "version": 1,
   "requires": [],
   "methods": {
-    "install_python3": {}
+    "install": {"params": ["package"]}
   }
 }

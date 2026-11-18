@@ -30,7 +30,23 @@ class ExecutionGraphTests(unittest.TestCase):
         self.assertEqual(network[1]['args'], ['192.0.2.10/24'])
         self.assertEqual(steps[5]['calls'][0]['executor'], 'agent-executor')
         self.assertEqual(steps[3]['calls'][0]['receiver'], 'packages')
+        self.assertEqual(steps[3]['calls'][0]['method'], 'install')
+        self.assertEqual(steps[3]['calls'][0]['args'], ['python3'])
+        self.assertNotIn('python3', (ROOT / 'modules/tumbleweed-zypper/methods/install.sh').read_text())
         self.assertNotIn('script', steps[4])
+
+    def test_package_is_an_argument_not_a_separate_method(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy(Path(tmp))
+            transition = 'transitions/install-python/transition.json'
+            self.change(root, transition, lambda doc: doc['operations'][0]['args'].update(package='git'))
+            self.assertEqual(expand(root)[3]['calls'][0]['args'], ['git'])
+            self.change(root, transition, lambda doc: doc['operations'][0]['args'].pop('package'))
+            with self.assertRaisesRegex(ValueError, 'invalid method call arguments'):
+                expand(root)
+            self.change(root, transition, lambda doc: doc['operations'][0]['args'].update(package=['python3']))
+            with self.assertRaisesRegex(ValueError, 'invalid method call arguments'):
+                expand(root)
 
     def test_missing_or_wrong_runtime_and_cross_target_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
