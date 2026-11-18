@@ -92,6 +92,19 @@ class TransitionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'invalid interface method'):
                 load(root)
 
+    def test_networkd_package_exposes_inspection_and_staging_without_an_activation_request(self):
+        _, modules, _ = load(ROOT)
+        module = modules[artifact_id(ref('module', 'tumbleweed-networkd'), 'module')]
+        self.assertEqual(module['requires'], [local('interface', 'os')])
+        self.assertEqual(set(module['methods']), {'inspect', 'configure'})
+        self.assertNotIn('networking', {entry['id'] for entry in (
+            json.loads(file.read_text()) for file in (ROOT / 'instances').glob('*.json'))})
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.copy_model(Path(temporary))
+            (root / 'modules/tumbleweed-networkd/methods/configure.sh').unlink()
+            with self.assertRaisesRegex(ValueError, 'invalid method implementation'):
+                load(root)
+
     def test_transition_invokes_bound_provider_method_before_its_script(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
