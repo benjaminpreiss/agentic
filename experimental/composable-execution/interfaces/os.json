@@ -1,0 +1,12 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "os",
+  "version": 1,
+  "requires": [],
+  "methods": {
+    "inspect_identity": {
+      "guarantee": "Reports whether the reached target currently identifies as the implementation's OS; this observation does not persist."
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "bash-admin",
+  "module": "did:web:agentic.invalid#module/tumbleweed-bash@1",
+  "target": "vm",
+  "bindings": {
+    "did:web:agentic.invalid#interface/executor@1": "admin-executor"
+  }
+}

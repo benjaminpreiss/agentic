@@ -1,0 +1,15 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "networking",
+  "version": 1,
+  "requires": [],
+  "methods": {
+    "inspect": {
+      "guarantee": "Reports the selected link's current addresses; does not establish remote reachability."
+    },
+    "configure": {
+      "guarantee": "Stages validated networkd configuration without activating it; a separate guarded operation must apply and independently verify connectivity."
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "bind-bash",
+  "version": 1,
+  "interface": "interface/bash-runtime@1",
+  "from": null,
+  "to": "module/tumbleweed-bash@1",
+  "operations": []
+}

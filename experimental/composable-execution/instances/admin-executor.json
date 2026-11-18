@@ -1,0 +1,13 @@
+{
+  "id": "admin-executor",
+  "module": "did:web:agentic.invalid#module/ssh-executor@1",
+  "target": "vm",
+  "provided": true,
+  "grants": [
+    "package-install",
+    "network-read",
+    "network-stage",
+    "os-read"
+  ],
+  "bindings": {}
+}

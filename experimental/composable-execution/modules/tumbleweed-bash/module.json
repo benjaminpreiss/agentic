@@ -1,0 +1,23 @@
+{
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "tumbleweed-bash",
+  "version": 1,
+  "implements": "interface/bash-runtime@1",
+  "requires": [
+    "interface/executor@1"
+  ],
+  "methods": {
+    "run": {
+      "calls": [
+        {"via": "interface/executor@1", "method": "invoke"}
+      ],
+      "accepts": [
+        "text/x-bash"
+      ]
+    }
+  },
+  "values": {
+    "path": "/usr/bin/bash"
+  }
+}

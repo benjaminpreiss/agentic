@@ -1,0 +1,16 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "install-python",
+  "version": 1,
+  "interface": "interface/python-runtime@1",
+  "from": null,
+  "to": "module/tumbleweed-python3@1",
+  "operations": [
+    {
+      "instance": "packages",
+      "method": "install",
+      "args": {"package": "python3"}
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "python-admin",
+  "module": "did:web:agentic.invalid#module/tumbleweed-python3@1",
+  "target": "vm",
+  "bindings": {
+    "did:web:agentic.invalid#interface/os@1": "host",
+    "did:web:agentic.invalid#interface/executor@1": "admin-executor",
+    "did:web:agentic.invalid#interface/package-manager@1": "packages"
+  }
+}
