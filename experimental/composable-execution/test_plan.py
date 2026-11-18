@@ -30,7 +30,9 @@ class ExecutionGraphTests(unittest.TestCase):
         network = by_instance['network']['calls']
         self.assertEqual([(c['runtime'], c['executor']) for c in network],
                          [('bash-admin', 'admin-executor'), ('python-admin', 'admin-executor')])
-        self.assertEqual(network[1]['args'], ['192.0.2.10/24'])
+        self.assertEqual(network[1]['method'], 'configure')
+        self.assertEqual(network[1]['args'], ['vm-uplink', '00:00:00:00:00:00', 'dhcp', '', '', ''])
+        self.assertTrue(network[1]['artifact'].endswith('tumbleweed-networkd/methods/stage.py'))
         self.assertEqual(by_instance['workspace']['calls'][0]['executor'], 'agent-executor')
         self.assertEqual(by_instance['python-admin']['calls'][0]['receiver'], 'packages')
         self.assertEqual(by_instance['python-admin']['calls'][0]['method'], 'install')
@@ -91,9 +93,19 @@ class ExecutionGraphTests(unittest.TestCase):
     def test_grants_are_checked_but_not_authenticated_by_planner(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.copy(Path(tmp))
-            self.change(root, 'instances/admin-executor.json', lambda doc: doc.update(grants=['network-read']))
+            self.change(root, 'instances/admin-executor.json',
+                        lambda doc: doc['grants'].remove('network-stage'))
             with self.assertRaisesRegex(ValueError, 'unauthorized or cross-target'):
                 expand(root)
+
+    def test_network_staging_must_be_explicitly_requested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy(Path(tmp))
+            self.change(root, 'requests.json', lambda doc: next(
+                entry for entry in doc['transitions'] if entry['instance'] == 'network'
+            ).update(transition='did:web:agentic.invalid#transition/check-network@1'))
+            calls = next(step for step in expand(root) if step['instance'] == 'network')['calls']
+            self.assertEqual([call['method'] for call in calls], ['inspect'])
 
     def test_executor_choice_comes_from_runtime_instance_not_module_or_method(self):
         with tempfile.TemporaryDirectory() as tmp:

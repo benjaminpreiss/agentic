@@ -10,10 +10,6 @@
     {
       "instance": "network",
       "method": "inspect"
-    },
-    {
-      "instance": "network",
-      "method": "validate_address"
     }
   ]
 }

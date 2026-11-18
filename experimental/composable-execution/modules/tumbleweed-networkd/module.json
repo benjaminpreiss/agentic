@@ -19,13 +19,18 @@
         "interface_name"
       ]
     },
-    "validate_address": {
+    "configure": {
       "runtime": "interface/python-runtime@1",
-      "artifact": "methods/validate-address.py",
+      "artifact": "methods/stage.py",
       "format": "text/x-python",
-      "grant": "network-read",
+      "grant": "network-stage",
       "args": [
-        "static_ipv4"
+        "interface_name",
+        "network_mac",
+        "network_mode",
+        "static_ipv4",
+        "gateway_ipv4",
+        "dns_servers"
       ]
     }
   }

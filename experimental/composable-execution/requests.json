@@ -22,7 +22,7 @@
     },
     {
       "instance": "network",
-      "transition": "did:web:agentic.invalid#transition/check-network@1"
+      "transition": "did:web:agentic.invalid#transition/stage-networkd@1"
     },
     {
       "instance": "workspace",
