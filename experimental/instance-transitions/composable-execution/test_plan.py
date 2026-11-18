@@ -32,8 +32,24 @@ class ExecutionGraphTests(unittest.TestCase):
         self.assertEqual(steps[3]['calls'][0]['receiver'], 'packages')
         self.assertEqual(steps[3]['calls'][0]['method'], 'install')
         self.assertEqual(steps[3]['calls'][0]['args'], ['python3'])
+        self.assertEqual(network[0]['runtime_values'], {'path': '/usr/bin/bash'})
+        self.assertEqual(network[1]['runtime_values'], {'path': '/usr/bin/python3'})
+        self.assertNotIn('executable', network[0])
         self.assertNotIn('python3', (ROOT / 'modules/tumbleweed-zypper/methods/install.sh').read_text())
         self.assertNotIn('script', steps[4])
+
+    def test_runtime_module_values_flow_through_the_bound_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy(Path(tmp))
+            self.change(root, 'modules/python-on-executor/module.json',
+                        lambda doc: doc['values'].update(path='/opt/runtime/python'))
+            network = next(step for step in expand(root) if step['instance'] == 'network')['calls']
+            self.assertEqual(network[1]['runtime_values'], {'path': '/opt/runtime/python'})
+            self.assertEqual(network[0]['runtime_values'], {'path': '/usr/bin/bash'})
+            self.change(root, 'modules/python-on-executor/module.json',
+                        lambda doc: doc['methods']['run'].update(accepts=['text/x-bash']))
+            with self.assertRaisesRegex(ValueError, 'runtime rejects artifact format'):
+                expand(root)
 
     def test_package_is_an_argument_not_a_separate_method(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -78,7 +94,7 @@ class ExecutionGraphTests(unittest.TestCase):
             self.assertEqual(calls[0]['executor'], 'agent-executor')
             self.assertEqual(calls[1]['executor'], 'admin-executor')
             self.change(root, 'modules/bash-on-executor/module.json',
-                        lambda doc: doc.update(accepts=['text/x-python']))
+                        lambda doc: doc['methods']['run'].update(accepts=['text/x-python']))
             with self.assertRaisesRegex(ValueError, 'runtime rejects artifact format'):
                 expand(root)
 

@@ -11,11 +11,13 @@
   "methods": {
     "run": {
       "implementation": "delegate",
-      "via": "interface/executor@1"
+      "via": "interface/executor@1",
+      "accepts": [
+        "text/x-python"
+      ]
     }
   },
-  "executable": "/usr/bin/python3",
-  "accepts": [
-    "text/x-python"
-  ]
+  "values": {
+    "path": "/usr/bin/python3"
+  }
 }

@@ -63,8 +63,12 @@ def catalog(root):
         if not set(reference(i, "interface", interfaces[implemented]["authority"])
                    for i in interfaces[implemented].get("requires", [])).issubset(required):
             raise ValueError(f"missing interface dependency: {key}")
+        values = module.get("values", {})
+        if (not isinstance(values, dict) or any(not isinstance(name, str) or not METHOD.fullmatch(name)
+                                                 for name in values)):
+            raise ValueError(f"invalid module values: {key}")
         methods = module.get("methods", {})
-        if set(methods) != set(interfaces[implemented]["methods"]):
+        if not isinstance(methods, dict) or set(methods) != set(interfaces[implemented]["methods"]):
             raise ValueError(f"incomplete module methods: {key}")
         for name, spec in methods.items():
             if not isinstance(spec, dict):
@@ -75,7 +79,11 @@ def catalog(root):
                 continue
             if spec.get("implementation") == "delegate":
                 via = reference(spec.get("via"), "interface", module["authority"])
-                if set(spec) != {"implementation", "via"} or via not in required or via[2] != "executor":
+                accepts = spec.get("accepts")
+                if (set(spec) != {"implementation", "via", "accepts"} or via not in required
+                        or via[2] != "executor" or not isinstance(accepts, list) or not accepts
+                        or any(not isinstance(fmt, str) or not fmt for fmt in accepts)
+                        or len(set(accepts)) != len(accepts)):
                     raise ValueError(f"invalid runtime delegate: {key}.{name}")
                 continue
             if set(spec) != {"runtime", "artifact", "format", "grant", "args"}:
@@ -216,7 +224,7 @@ def expand(root=ROOT):
                 raise ValueError(f"method runtime not bound: {receiver_name}.{operation['method']}")
             runtime_name = receiver["_bindings"][runtime_iface]
             runtime = instances[runtime_name]
-            if method["format"] not in runtime["_module"].get("accepts", []):
+            if method["format"] not in runtime["_module"]["methods"]["run"]["accepts"]:
                 raise ValueError(f"runtime rejects artifact format: {runtime_name}")
             executor_iface = reference("interface/executor@1", "interface", runtime["_module"]["authority"])
             if executor_iface not in runtime["_bindings"]:
@@ -236,7 +244,7 @@ def expand(root=ROOT):
                           "args": [(supplied if arg in supplied else inputs)[arg] for arg in method["args"]],
                           "artifact": str(receiver["_module"]["_file"].parent / method["artifact"]),
                           "runtime": runtime_name, "format": method["format"],
-                          "executable": runtime["_module"].get("executable"),
+                          "runtime_values": runtime["_module"].get("values", {}),
                           "executor": executor_name, "target": receiver["target"],
                           "grant": method["grant"]})
         plan.append({"instance": name, "transition": transition["name"], "calls": calls})

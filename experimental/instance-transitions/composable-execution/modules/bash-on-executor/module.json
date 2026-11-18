@@ -10,11 +10,13 @@
   "methods": {
     "run": {
       "implementation": "delegate",
-      "via": "interface/executor@1"
+      "via": "interface/executor@1",
+      "accepts": [
+        "text/x-bash"
+      ]
     }
   },
-  "executable": "/usr/bin/bash",
-  "accepts": [
-    "text/x-bash"
-  ]
+  "values": {
+    "path": "/usr/bin/bash"
+  }
 }

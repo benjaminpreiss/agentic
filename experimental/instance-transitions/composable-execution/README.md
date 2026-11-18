@@ -9,7 +9,7 @@ python3 -m unittest discover -s . -p 'test_*.py'
 python3 plan.py --expand
 ```
 
-`interfaces/*.json` describe executor, Bash and Python runtimes, package manager, networking and workspace capabilities. A runtime's `run` method delegates to its bound executor's `invoke` method. `modules/*/module.json` implement these interfaces. The Tumbleweed network module uses **both** Bash and Python runtimes; their Bash/Python artifact formats are implementation-specific, not properties of the networking interface or planner. The workspace uses another instance of the *same* Bash runtime module.
+`interfaces/*.json` describe executor, Bash and Python runtimes, package manager, networking and workspace capabilities. A runtime's `run` method delegates to its bound executor's `invoke` method. `modules/*/module.json` implement these interfaces. The Tumbleweed network module uses **both** Bash and Python runtimes; their Bash/Python artifact formats are implementation-specific, not properties of the networking interface or planner. The workspace uses another instance of the *same* Bash runtime module. Each runtime's `methods.run.accepts` declares supported artifact formats; its `values.path` declares an implementation-specific interpreter path. The plan carries this under `runtime_values`, not as a universal `executable` field. These are static declarations, **not** observations that an interpreter exists on the target.
 
 `instances/*.json` choose the bindings:
 
