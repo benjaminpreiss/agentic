@@ -1,9 +1,9 @@
 # Independent draft: module instances and separate deployment transitions
 
-**Question:** Can modules declare interface capabilities and static information while independent transitions bring instances into use? This runnable subset has **values but no instance methods** yet. [CURRENT-REPO-MAP.md](CURRENT-REPO-MAP.md) maps the supported NixOS repository to the broader interface/module/instance/transition/method model without claiming support in this experiment. The experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact declarations use `(kind, authority, name, version)` coordinates; references have a compact string syntax.
+**Question:** Can modules declare interface capabilities and static information while independent transitions bring instances into use? This runnable subset has **values but no implemented instance methods** yet. [INTERFACE-STRUCTURE.md](INTERFACE-STRUCTURE.md) describes the complete proposed Tumbleweed interface catalog, its dependencies and method contracts; only three interfaces have example modules and transitions so far. [CURRENT-REPO-MAP.md](CURRENT-REPO-MAP.md) records which supported NixOS behaviors need replacement, not a Nix implementation of the new system. The experiment starts from `main`; it does **not** change [draft PR #39](https://github.com/benjaminpreiss/agentic/pull/39) or the supported NixOS deployment. JSON is the canonical representation; a typed authoring language could emit it later. Artifact declarations use `(kind, authority, name, version)` coordinates; references have a compact string syntax.
 
 ```text
-interfaces/{os,login-shell,account}.v1.json  conceptual contracts and static value types
+interfaces/*.v1.json                   whole proposed capability catalog; three runnable examples
 modules/*/module.json                   implementations, values and required interfaces; no scripts
 instances/*.json                       desired configured instances and provider bindings
 requests/introduction.json             explicit transitions to run for those instances

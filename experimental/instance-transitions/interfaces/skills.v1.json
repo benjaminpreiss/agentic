@@ -1,0 +1,1 @@
+{"kind":"interface","authority":"did:web:agentic.invalid","name":"skills","version":1,"requires":["interface/agent-harness@1"],"values":{},"methods":{"inspect_selection":{"params":[],"guarantee":"Reports selected skills and the resolved checked-in content now."},"activate":{"params":[],"guarantee":"Installs reviewed skill links without replacing user-managed entries."}}}

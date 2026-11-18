@@ -1,6 +1,6 @@
 # Mapping the current Agentic NixOS repo to the draft model
 
-This is a **conceptual inventory**, not an executable NixOS plan. It maps the supported deployment at `origin/main` (`f73e8ca`) to proposed interfaces, modules, instances, transitions, and instance methods. The runnable experiment in this directory is still a **separate Tumbleweed example** with three interfaces and no methods. Nothing here changes `nixos/`, stages a new flake, or validates a VM deployment.
+This is a **historical inventory of behaviors to replace**, not the proposed interface structure (see [INTERFACE-STRUCTURE.md](INTERFACE-STRUCTURE.md)) and not an executable NixOS plan. It maps the supported deployment at `origin/main` (`f73e8ca`) to proposed interfaces, modules, instances, transitions, and instance methods. The runnable experiment in this directory is still a **separate Tumbleweed example** with three interfaces and no methods. Nothing here changes `nixos/`, stages a new flake, or validates a VM deployment.
 
 ## Separate the five roles
 

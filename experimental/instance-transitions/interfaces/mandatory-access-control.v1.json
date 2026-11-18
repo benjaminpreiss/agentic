@@ -1,0 +1,1 @@
+{"kind":"interface","authority":"did:web:agentic.invalid","name":"mandatory-access-control","version":1,"requires":["interface/os@1"],"values":{},"methods":{"inspect":{"params":[],"guarantee":"Observes active mandatory access control and loaded policy now."}}}

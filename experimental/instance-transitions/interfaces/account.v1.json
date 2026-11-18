@@ -1,5 +1,7 @@
 {
   "kind": "interface", "authority": "did:web:agentic.invalid", "name": "account", "version": 1,
   "description": "A configured local login account bound to a login shell.",
-  "values": {}
+  "requires": ["interface/os@1", "interface/login-shell@1"],
+  "values": {},
+  "methods": {"inspect": {"params": [], "guarantee": "Observes the configured account and its shell now; does not attest future membership or access."}}
 }

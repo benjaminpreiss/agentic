@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parent
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 ARG = re.compile(r"[a-z][a-z0-9_]*\Z")
 DID = re.compile(r"did:[a-z0-9]+:[A-Za-z0-9._:%-]+\Z")
-PATH = re.compile(r"/[A-Za-z0-9_./-]+\Z")
 ID_FIELDS = {"kind", "authority", "name", "version"}
 LOCAL_REF = re.compile(r"(interface|module|transition)/([a-z][a-z0-9-]*)@([1-9][0-9]*)\Z")
 FULL_REF = re.compile(r"(did:[a-z0-9]+:[A-Za-z0-9._:%-]+)#(interface|module|transition)/([a-z][a-z0-9-]*)@([1-9][0-9]*)\Z")
@@ -60,11 +59,7 @@ def declaration_id(doc, kind):
 
 
 def value_is(value, kind):
-    if kind == "string":
-        return isinstance(value, str)
-    if kind == "absolute-path":
-        return isinstance(value, str) and bool(PATH.fullmatch(value)) and ".." not in value.split("/")
-    return False
+    return kind == "string" and isinstance(value, str)
 
 
 def documents(root, kind):
@@ -88,11 +83,45 @@ def load(root):
             raise ValueError(f"invalid or duplicate interface: {file}")
         for name, spec in doc["values"].items():
             if (not isinstance(name, str) or not ARG.fullmatch(name) or not isinstance(spec, dict)
-                    or spec.get("type") not in ("string", "absolute-path") or not spec.get("guarantee")):
+                    or set(spec) != {"guarantee"} or not isinstance(spec["guarantee"], str)
+                    or not spec["guarantee"]):
                 raise ValueError(f"invalid interface value: {file}.{name}")
+        methods = doc.get("methods", {})
+        if not isinstance(methods, dict):
+            raise ValueError(f"invalid interface methods: {file}")
+        for method, spec in methods.items():
+            if (not isinstance(method, str) or not ARG.fullmatch(method) or not isinstance(spec, dict)
+                    or set(spec) != {"params", "guarantee"} or not isinstance(spec["params"], list)
+                    or any(not isinstance(param, str) or not ARG.fullmatch(param) for param in spec["params"])
+                    or len(set(spec["params"])) != len(spec["params"])
+                    or not isinstance(spec["guarantee"], str) or not spec["guarantee"]):
+                raise ValueError(f"invalid interface method: {file}.{method}")
         if "transitions" in doc or "scripts" in doc:
             raise ValueError(f"interface contains deployment effects: {file}")
         interfaces[key] = doc
+
+    dependencies = {}
+    for key, doc in interfaces.items():
+        required = doc.get("requires", [])
+        if not isinstance(required, list):
+            raise ValueError(f"invalid interface dependencies: {artifact_ref(doc)}")
+        deps = [reference_id(i, "interface", doc["authority"]) for i in required]
+        if len(deps) != len(set(deps)) or any(dep not in interfaces for dep in deps):
+            raise ValueError(f"invalid interface dependencies: {artifact_ref(doc)}")
+        dependencies[key] = deps
+    active, visited = set(), set()
+    def check_dependencies(key):
+        if key in active:
+            raise ValueError(f"interface dependency cycle: {artifact_ref(interfaces[key])}")
+        if key in visited:
+            return
+        active.add(key)
+        for dep in dependencies[key]:
+            check_dependencies(dep)
+        active.remove(key)
+        visited.add(key)
+    for key in interfaces:
+        check_dependencies(key)
 
     modules = documents(root, "module")
     for key, mod in modules.items():
@@ -103,13 +132,14 @@ def load(root):
         if not isinstance(required, list):
             raise ValueError(f"invalid required interfaces: {artifact_ref(mod)}")
         required_ids = [reference_id(i, "interface", mod["authority"]) for i in required]
-        if len(set(required_ids)) != len(required_ids) or any(i not in interfaces for i in required_ids):
+        if (len(set(required_ids)) != len(required_ids) or any(i not in interfaces for i in required_ids)
+                or not set(dependencies[interface]).issubset(required_ids)):
             raise ValueError(f"invalid required interfaces: {artifact_ref(mod)}")
         declared = mod.get("values")
         if not isinstance(declared, dict) or set(declared) != set(interfaces[interface]["values"]):
             raise ValueError(f"incomplete provided values: {artifact_ref(mod)}")
         for name, value in declared.items():
-            if not value_is(value, interfaces[interface]["values"][name]["type"]):
+            if not isinstance(value, str):
                 raise ValueError(f"invalid provided value: {artifact_ref(mod)}.{name}")
         config, uses = mod.get("config", {}), mod.get("uses", [])
         if (not isinstance(config, dict) or any(not isinstance(k, str) or not ARG.fullmatch(k) or v != "string"

@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from plan import ROOT, artifact_id, expand, reference_id, script
+from plan import ROOT, artifact_id, expand, load, reference_id, script
 
 AUTHORITY = 'did:web:agentic.invalid'  # claimed fixture; NOT resolved or authenticated
 
@@ -46,6 +46,49 @@ class TransitionTests(unittest.TestCase):
                 if directory == 'modules':
                     self.assertFalse({'script', 'transitions', 'entrypoint'} & set(declaration))
 
+    def test_full_interface_catalog_and_dependency_graph(self):
+        interfaces, _, _ = load(ROOT)
+        self.assertEqual({key[2] for key in interfaces}, {
+            'os', 'package-manager', 'networking', 'firewall', 'ssh-access',
+            'intrusion-prevention', 'mandatory-access-control', 'kernel-hardening',
+            'account', 'recovery-access', 'login-shell', 'workspace', 'git-client',
+            'sandbox', 'agent-harness', 'skills', 'backup', 'scheduler',
+            'diagnostics', 'status-screen', 'github-app-credentials', 'github-mcp',
+            'git-credentials', 'github-protection-audit'})
+        by_name = {key[2]: doc for key, doc in interfaces.items()}
+        self.assertEqual(by_name['firewall']['requires'], [local('interface', 'networking')])
+        self.assertEqual(by_name['ssh-access']['requires'],
+                         [local('interface', 'networking'), local('interface', 'firewall')])
+        self.assertEqual(by_name['git-credentials']['requires'],
+                         [local('interface', 'git-client'), local('interface', 'github-app-credentials')])
+        self.assertNotIn(local('interface', 'git-client'), by_name['github-mcp']['requires'])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.copy_model(Path(temporary))
+            file = root / 'interfaces/networking.v1.json'
+            networking = json.loads(file.read_text())
+            networking['requires'] = [local('interface', 'firewall')]
+            file.write_text(json.dumps(networking))
+            with self.assertRaisesRegex(ValueError, 'interface dependency cycle'):
+                load(root)
+            networking['requires'] = [local('interface', 'missing')]
+            file.write_text(json.dumps(networking))
+            with self.assertRaisesRegex(ValueError, 'invalid interface dependencies'):
+                load(root)
+            file.write_text((ROOT / 'interfaces/networking.v1.json').read_text())
+            account = root / 'modules/linux-local-account/module.json'
+            module = json.loads(account.read_text())
+            module['requires'] = [local('interface', 'login-shell')]
+            account.write_text(json.dumps(module))
+            with self.assertRaisesRegex(ValueError, 'invalid required interfaces'):
+                load(root)
+            account.write_text((ROOT / 'modules/linux-local-account/module.json').read_text())
+            spec = root / 'interfaces/firewall.v1.json'
+            firewall = json.loads(spec.read_text())
+            firewall['methods']['ensure_ingress']['params'].append('port')
+            spec.write_text(json.dumps(firewall))
+            with self.assertRaisesRegex(ValueError, 'invalid interface method'):
+                load(root)
+
     def test_two_accounts_share_module_and_provider_under_distinct_instance_ids(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
@@ -66,7 +109,7 @@ class TransitionTests(unittest.TestCase):
             old.mkdir()
             (old / 'module.json').write_text(json.dumps({
                 **ref('module', 'legacy-zsh', authority='did:web:other.invalid'),
-                'implements': link('interface', 'login-shell'), 'requires': [],
+                'implements': link('interface', 'login-shell'), 'requires': [link('interface', 'os')],
                 'values': {'path': '/old/bin/zsh'}, 'config': {}, 'uses': []}))
             upgrade = root / 'transitions/upgrade-zsh'
             upgrade.mkdir()
@@ -78,6 +121,12 @@ class TransitionTests(unittest.TestCase):
                 'script': 'run.sh', 'args': [{'side': 'from', 'name': 'path'}, {'side': 'to', 'name': 'path'}]}))
             requests = self.requests(root)
             requests['transitions'][1]['transition'] = link('transition', 'upgrade-zsh')
+            requests['transitions'][1]['from_bindings'] = json.loads(
+                (root / 'instances/interactive.json').read_text())['bindings']
+            os_transition_file = root / 'transitions/introduce-os/transition.json'
+            os_transition = json.loads(os_transition_file.read_text())
+            os_transition['from'] = local('module', 'opensuse-tumbleweed')
+            os_transition_file.write_text(json.dumps(os_transition))
             steps = expand(root, self.save_requests(root, requests))
             self.assertEqual([arg['value'] for arg in steps[1]['args']], ['/old/bin/zsh', '/usr/bin/zsh'])
             self.assertEqual(steps[2]['args'][1]['value'], '/usr/bin/zsh')
