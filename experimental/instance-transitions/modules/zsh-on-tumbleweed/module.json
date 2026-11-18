@@ -1,9 +1,23 @@
 {
-  "kind": "module", "authority": "did:web:agentic.invalid", "name": "zsh-on-tumbleweed", "version": 1,
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "zsh-on-tumbleweed",
+  "version": 1,
   "implements": "interface/login-shell@1",
-  "requires": ["interface/os@1"],
-  "values": {"path": "/usr/bin/zsh"},
-  "methods": {"inspect": {"script": "methods/inspect.sh", "args": ["path"]}},
+  "requires": [
+    "interface/os@1"
+  ],
+  "values": {
+    "path": "/usr/bin/zsh"
+  },
+  "methods": {
+    "inspect": {
+      "script": "methods/inspect.sh",
+      "args": [
+        "path"
+      ]
+    }
+  },
   "config": {},
   "uses": []
 }

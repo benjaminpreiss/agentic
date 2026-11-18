@@ -1,1 +1,16 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"status-screen","version":1,"requires":["interface/account@1"],"values":{},"methods":{"render":{"params":[],"guarantee":"Renders a snapshot of available tools and reported checks without treating them as deployment history."}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "status-screen",
+  "version": 1,
+  "requires": [
+    "interface/account@1"
+  ],
+  "values": {},
+  "methods": {
+    "render": {
+      "params": [],
+      "guarantee": "Renders a snapshot of available tools and reported checks without treating them as deployment history."
+    }
+  }
+}

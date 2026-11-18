@@ -1,1 +1,10 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"package-manager","version":1,"requires":[],"methods":{"install_python3":{}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "package-manager",
+  "version": 1,
+  "requires": [],
+  "methods": {
+    "install_python3": {}
+  }
+}

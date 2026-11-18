@@ -1,1 +1,20 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"backup","version":1,"requires":["interface/account@1"],"values":{},"methods":{"run":{"params":[],"guarantee":"Creates and verifies a local archive; returns the archive location for this invocation, not a static value."},"inspect":{"params":[],"guarantee":"Reports available local archives now; does not imply off-server safety."}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "backup",
+  "version": 1,
+  "requires": [
+    "interface/account@1"
+  ],
+  "values": {},
+  "methods": {
+    "run": {
+      "params": [],
+      "guarantee": "Creates and verifies a local archive; returns the archive location for this invocation, not a static value."
+    },
+    "inspect": {
+      "params": [],
+      "guarantee": "Reports available local archives now; does not imply off-server safety."
+    }
+  }
+}

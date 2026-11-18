@@ -1,9 +1,23 @@
 {
-  "kind": "module", "authority": "did:web:agentic.invalid", "name": "tumbleweed-zypper", "version": 1,
-  "implements": "interface/package-manager@1", "requires": ["interface/os@1"],
-  "values": {}, "config": {}, "uses": [],
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "tumbleweed-zypper",
+  "version": 1,
+  "implements": "interface/package-manager@1",
+  "requires": [
+    "interface/os@1"
+  ],
+  "values": {},
+  "config": {},
+  "uses": [],
   "methods": {
-    "inspect": {"script": "methods/inspect.sh", "args": []},
-    "install": {"script": "methods/install.sh", "args": []}
+    "inspect": {
+      "script": "methods/inspect.sh",
+      "args": []
+    },
+    "install": {
+      "script": "methods/install.sh",
+      "args": []
+    }
   }
 }

@@ -1,1 +1,15 @@
-{"kind":"transition","authority":"did:web:agentic.invalid","name":"install-python","version":1,"interface":"interface/python-runtime@1","from":null,"to":"module/python-on-executor@1","operations":[{"instance":"packages","method":"install_python3"}]}
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "install-python",
+  "version": 1,
+  "interface": "interface/python-runtime@1",
+  "from": null,
+  "to": "module/python-on-executor@1",
+  "operations": [
+    {
+      "instance": "packages",
+      "method": "install_python3"
+    }
+  ]
+}

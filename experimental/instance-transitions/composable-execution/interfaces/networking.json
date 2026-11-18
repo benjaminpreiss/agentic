@@ -1,1 +1,11 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"networking","version":1,"requires":[],"methods":{"inspect":{},"validate_address":{}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "networking",
+  "version": 1,
+  "requires": [],
+  "methods": {
+    "inspect": {},
+    "validate_address": {}
+  }
+}

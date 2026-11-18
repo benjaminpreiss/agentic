@@ -1,1 +1,17 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"github-mcp","version":1,"requires":["interface/github-app-credentials@1","interface/agent-harness@1"],"values":{},"methods":{"inspect":{"params":[],"guarantee":"Checks the local MCP transport and client entry now without exposing App credentials."}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "github-mcp",
+  "version": 1,
+  "requires": [
+    "interface/github-app-credentials@1",
+    "interface/agent-harness@1"
+  ],
+  "values": {},
+  "methods": {
+    "inspect": {
+      "params": [],
+      "guarantee": "Checks the local MCP transport and client entry now without exposing App credentials."
+    }
+  }
+}

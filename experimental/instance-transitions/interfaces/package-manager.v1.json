@@ -1,1 +1,24 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"package-manager","version":1,"requires":["interface/os@1"],"values":{},"methods":{"inspect":{"params":["package"],"guarantee":"Observes the installed package and version now."},"install":{"params":["package"],"guarantee":"Attempts a reviewed package install and verifies the result; not an unbounded shell command."}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "package-manager",
+  "version": 1,
+  "requires": [
+    "interface/os@1"
+  ],
+  "values": {},
+  "methods": {
+    "inspect": {
+      "params": [
+        "package"
+      ],
+      "guarantee": "Observes the installed package and version now."
+    },
+    "install": {
+      "params": [
+        "package"
+      ],
+      "guarantee": "Attempts a reviewed package install and verifies the result; not an unbounded shell command."
+    }
+  }
+}

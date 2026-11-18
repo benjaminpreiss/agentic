@@ -1,1 +1,19 @@
-{"kind":"module","authority":"did:web:agentic.invalid","name":"tumbleweed-zypper","version":1,"implements":"interface/package-manager@1","requires":["interface/bash-runtime@1"],"methods":{"install_python3":{"runtime":"interface/bash-runtime@1","artifact":"methods/install-python3.sh","format":"text/x-bash","grant":"package-install","args":[]}}}
+{
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "tumbleweed-zypper",
+  "version": 1,
+  "implements": "interface/package-manager@1",
+  "requires": [
+    "interface/bash-runtime@1"
+  ],
+  "methods": {
+    "install_python3": {
+      "runtime": "interface/bash-runtime@1",
+      "artifact": "methods/install-python3.sh",
+      "format": "text/x-bash",
+      "grant": "package-install",
+      "args": []
+    }
+  }
+}

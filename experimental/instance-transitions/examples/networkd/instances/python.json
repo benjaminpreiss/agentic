@@ -1,1 +1,11 @@
-{"id":"python","module":"did:web:agentic.invalid#module/tumbleweed-python3@1","bindings":[{"interface":"did:web:agentic.invalid#interface/package-manager@1","instance":"packages"}],"inputs":{}}
+{
+  "id": "python",
+  "module": "did:web:agentic.invalid#module/tumbleweed-python3@1",
+  "bindings": [
+    {
+      "interface": "did:web:agentic.invalid#interface/package-manager@1",
+      "instance": "packages"
+    }
+  ],
+  "inputs": {}
+}

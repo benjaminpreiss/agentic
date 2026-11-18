@@ -1,1 +1,21 @@
-{"kind":"module","authority":"did:web:agentic.invalid","name":"tumbleweed-workspace","version":1,"implements":"interface/workspace@1","requires":["interface/bash-runtime@1"],"methods":{"inspect":{"runtime":"interface/bash-runtime@1","artifact":"methods/inspect.sh","format":"text/x-bash","grant":"workspace-read","args":["home"]}}}
+{
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "tumbleweed-workspace",
+  "version": 1,
+  "implements": "interface/workspace@1",
+  "requires": [
+    "interface/bash-runtime@1"
+  ],
+  "methods": {
+    "inspect": {
+      "runtime": "interface/bash-runtime@1",
+      "artifact": "methods/inspect.sh",
+      "format": "text/x-bash",
+      "grant": "workspace-read",
+      "args": [
+        "home"
+      ]
+    }
+  }
+}

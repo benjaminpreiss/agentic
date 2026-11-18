@@ -1,1 +1,29 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"git-client","version":1,"requires":["interface/package-manager@1"],"values":{},"methods":{"inspect":{"params":[],"guarantee":"Reports the available Git executable and version now."},"configure_identity":{"params":["name","email"],"guarantee":"Configures Git author identity for the bound account without changing unrelated settings."},"configure_credential_helper":{"params":["helper"],"guarantee":"Installs a reviewed credential helper for the bound account without exposing long-lived secrets."}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "git-client",
+  "version": 1,
+  "requires": [
+    "interface/package-manager@1"
+  ],
+  "values": {},
+  "methods": {
+    "inspect": {
+      "params": [],
+      "guarantee": "Reports the available Git executable and version now."
+    },
+    "configure_identity": {
+      "params": [
+        "name",
+        "email"
+      ],
+      "guarantee": "Configures Git author identity for the bound account without changing unrelated settings."
+    },
+    "configure_credential_helper": {
+      "params": [
+        "helper"
+      ],
+      "guarantee": "Installs a reviewed credential helper for the bound account without exposing long-lived secrets."
+    }
+  }
+}

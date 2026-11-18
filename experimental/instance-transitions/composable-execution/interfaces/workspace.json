@@ -1,1 +1,10 @@
-{"kind":"interface","authority":"did:web:agentic.invalid","name":"workspace","version":1,"requires":[],"methods":{"inspect":{}}}
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "workspace",
+  "version": 1,
+  "requires": [],
+  "methods": {
+    "inspect": {}
+  }
+}

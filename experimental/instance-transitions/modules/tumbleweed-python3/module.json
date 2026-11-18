@@ -1,6 +1,23 @@
 {
-  "kind": "module", "authority": "did:web:agentic.invalid", "name": "tumbleweed-python3", "version": 1,
-  "implements": "interface/python-runtime@1", "requires": ["interface/package-manager@1"],
-  "values": {"path": "/usr/bin/python3"}, "config": {}, "uses": [],
-  "methods": {"inspect": {"script": "methods/inspect.sh", "args": ["path"]}}
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "tumbleweed-python3",
+  "version": 1,
+  "implements": "interface/python-runtime@1",
+  "requires": [
+    "interface/package-manager@1"
+  ],
+  "values": {
+    "path": "/usr/bin/python3"
+  },
+  "config": {},
+  "uses": [],
+  "methods": {
+    "inspect": {
+      "script": "methods/inspect.sh",
+      "args": [
+        "path"
+      ]
+    }
+  }
 }

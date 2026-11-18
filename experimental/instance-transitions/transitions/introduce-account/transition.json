@@ -1,12 +1,29 @@
 {
-  "kind": "transition", "authority": "did:web:agentic.invalid", "name": "introduce-account", "version": 1,
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "introduce-account",
+  "version": 1,
   "interface": "interface/account@1",
   "from": null,
   "to": "module/linux-local-account@1",
   "script": "run.sh",
-  "calls": [{"phase": "after", "side": "to", "via": "self", "method": "inspect", "params": {}}],
+  "calls": [
+    {
+      "phase": "after",
+      "side": "to",
+      "via": "self",
+      "method": "inspect",
+      "params": {}
+    }
+  ],
   "args": [
-    {"side": "to", "name": "account_name"},
-    {"side": "to", "name": "shell_path"}
+    {
+      "side": "to",
+      "name": "account_name"
+    },
+    {
+      "side": "to",
+      "name": "shell_path"
+    }
   ]
 }

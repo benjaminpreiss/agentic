@@ -1,1 +1,11 @@
-{"id":"admin-executor","module":"did:web:agentic.invalid#module/external-executor@1","target":"vm","provided":true,"grants":["package-install","network-read"],"bindings":{}}
+{
+  "id": "admin-executor",
+  "module": "did:web:agentic.invalid#module/external-executor@1",
+  "target": "vm",
+  "provided": true,
+  "grants": [
+    "package-install",
+    "network-read"
+  ],
+  "bindings": {}
+}

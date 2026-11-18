@@ -1,7 +1,15 @@
 {
-  "kind": "interface", "authority": "did:web:agentic.invalid", "name": "os", "version": 1,
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "os",
+  "version": 1,
   "description": "An operating-system substrate bound into the deployment.",
   "requires": [],
   "values": {},
-  "methods": {"inspect_identity": {"params": [], "guarantee": "Reports the observed OS identity at invocation; does not assume it remains unchanged."}}
+  "methods": {
+    "inspect_identity": {
+      "params": [],
+      "guarantee": "Reports the observed OS identity at invocation; does not assume it remains unchanged."
+    }
+  }
 }
