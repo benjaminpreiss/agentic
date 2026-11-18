@@ -1,0 +1,10 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "bind-zypper",
+  "version": 1,
+  "interface": "interface/package-manager@1",
+  "from": null,
+  "to": "module/tumbleweed-zypper@1",
+  "operations": []
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "check-network",
+  "version": 1,
+  "interface": "interface/networking@1",
+  "from": null,
+  "to": "module/tumbleweed-networkd@1",
+  "operations": [
+    {
+      "instance": "network",
+      "method": "inspect"
+    },
+    {
+      "instance": "network",
+      "method": "validate_address"
+    }
+  ]
+}

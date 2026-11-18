@@ -1,0 +1,8 @@
+{
+  "id": "bash-agent",
+  "module": "did:web:agentic.invalid#module/bash-on-executor@1",
+  "target": "vm",
+  "bindings": {
+    "did:web:agentic.invalid#interface/executor@1": "agent-executor"
+  }
+}
