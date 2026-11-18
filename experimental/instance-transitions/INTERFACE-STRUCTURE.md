@@ -7,7 +7,7 @@ An arrow `A → B` below means the instance providing **A requires a direct bind
 | Interface | Requires | Functionality covered from the existing repo |
 | --- | --- | --- |
 | `os` | — | Verify the Tumbleweed substrate. Existing OS installation is a prerequisite; no Disko or bootloader installer is carried forward. |
-| `package-manager` | `os` | `tumbleweed-zypper` implements a generic `install(package)` method; the Python introduction transition supplies `python3` as its argument. Authorization of package choices belongs to the reviewed request and executor policy, not one method per package. |
+| `package-manager` | `os` | `tumbleweed-zypper` implements a generic `install(package)` method; the Python introduction transition supplies `python3` as its argument. This script-rendering prototype has no authenticated package authorization; review package choices in the requested transition before any disposable-VM run. |
 | `python-runtime` | — | Declared interpreter path and target-side version check. The Tumbleweed implementation binds `package-manager` and its introduction transition explicitly installs Python 3. Other implementations need not use a package manager. |
 | `networking` | `os` | `tumbleweed-networkd` additionally binds `python-runtime`, verifies the selected interface/MAC and stages a reviewed DHCP or static IPv4 networkd file. It refuses to switch managers or activate the network. Activation still needs an external connectivity check and recovery path. |
 | `firewall` | `networking` | Caller-owned ingress rules and policy observation. The firewall owns the rules, not each consumer. |
