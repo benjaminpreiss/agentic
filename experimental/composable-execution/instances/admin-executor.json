@@ -1,6 +1,6 @@
 {
   "id": "admin-executor",
-  "interface": "did:web:agentic.invalid#interface/executor@1",
+  "module": "did:web:agentic.invalid#module/ssh-executor@1",
   "target": "vm",
   "provided": true,
   "grants": [

@@ -122,7 +122,7 @@ class ExecutionGraphTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'runtime rejects artifact format'):
                 expand(root)
 
-    def test_provided_executor_is_interface_only_unbound_with_well_formed_claims(self):
+    def test_provided_executor_has_real_module_unbound_with_well_formed_claims(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.copy(Path(tmp))
             self.change(root, 'instances/admin-executor.json',
@@ -132,12 +132,17 @@ class ExecutionGraphTests(unittest.TestCase):
             shutil.copy(ROOT / 'instances/admin-executor.json', root / 'instances/admin-executor.json')
             self.change(root, 'instances/admin-executor.json', lambda doc: doc['bindings'].update({
                 'did:web:agentic.invalid#interface/bash-runtime@1': 'bash-admin'}))
-            with self.assertRaisesRegex(ValueError, 'only unbound interface-only bootstrap executors'):
+            with self.assertRaisesRegex(ValueError, 'only unbound executor modules'):
                 expand(root)
             shutil.copy(ROOT / 'instances/admin-executor.json', root / 'instances/admin-executor.json')
             self.change(root, 'instances/admin-executor.json', lambda doc: doc.update(module=
                         'did:web:agentic.invalid#module/tumbleweed-bash@1'))
-            with self.assertRaisesRegex(ValueError, 'only unbound interface-only bootstrap executors'):
+            with self.assertRaisesRegex(ValueError, 'only unbound executor modules'):
+                expand(root)
+            shutil.copy(ROOT / 'instances/admin-executor.json', root / 'instances/admin-executor.json')
+            self.change(root, 'instances/admin-executor.json', lambda doc: doc.update(interface=
+                        'did:web:agentic.invalid#interface/executor@1'))
+            with self.assertRaisesRegex(ValueError, 'executor instance needs an implementation'):
                 expand(root)
 
     def test_method_receiver_must_be_bound_and_artifact_packaged(self):

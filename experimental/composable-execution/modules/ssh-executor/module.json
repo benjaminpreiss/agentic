@@ -1,0 +1,13 @@
+{
+  "kind": "module",
+  "authority": "did:web:agentic.invalid",
+  "name": "ssh-executor",
+  "version": 1,
+  "implements": "interface/executor@1",
+  "requires": [],
+  "methods": {
+    "invoke": {
+      "adapter": "ssh"
+    }
+  }
+}

@@ -1,15 +1,54 @@
-"""Interpret reviewed runtime method calls with explicitly injected executors.
+"""Interpret reviewed runtime methods with explicitly configured executor modules.
 
-No production executor, local process runner, SSH transport or CLI is supplied here.
-An injected executor must authenticate its target and enforce its own policy;
-fixture target/grant labels are never authorization.
+No CLI, credentials or default policy is supplied. Calling run_configured with
+real settings crosses the execution seam and can change a target.
 """
 
-from plan import ROOT, expand
+import json
+from pathlib import Path
+
+from executor_adapters import LocalProcessExecutor, SSHExecutor
+from plan import ROOT, catalog, expand, reference
 
 
 class InvocationFailed(RuntimeError):
     """A bound executor rejected or failed a requested method invocation."""
+
+
+def configured_executors(settings, root=ROOT):
+    """Construct real adapters for provided executor modules using out-of-band settings.
+
+    Settings must include an independent `policy` callable per executor. SSH
+    credentials/host details are supplied by the caller, never instance JSON.
+    """
+    if not isinstance(settings, dict):
+        raise ValueError('executor settings must be keyed by instance ID')
+    docs = catalog(root)
+    adapters = {}
+    for file in sorted((Path(root) / 'instances').glob('*.json')):
+        instance = json.loads(file.read_text())
+        if not instance.get('provided', False):
+            continue
+        name = instance['id']
+        mod = docs['module'][reference(instance['module'], 'module')]
+        implementation = mod['methods']['invoke']['adapter']
+        options = settings.get(name)
+        if not isinstance(options, dict):
+            raise ValueError(f'missing executor settings: {name}')
+        if implementation == 'local-process':
+            adapters[name] = LocalProcessExecutor(root, **options)
+        elif implementation == 'ssh':
+            adapters[name] = SSHExecutor(root, **options)
+        else:
+            raise ValueError(f'unsupported executor implementation: {name}')
+    if set(settings) != set(adapters):
+        raise ValueError('executor settings do not match provided instances')
+    return adapters
+
+
+def run_configured(settings, root=ROOT):
+    """Run explicitly requested transitions using concrete configured executors."""
+    return run_requested(configured_executors(settings, root), root)
 
 
 def run_requested(executors, root=ROOT):
