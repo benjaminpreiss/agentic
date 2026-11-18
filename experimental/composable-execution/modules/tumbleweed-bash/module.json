@@ -9,8 +9,9 @@
   ],
   "methods": {
     "run": {
-      "implementation": "delegate",
-      "via": "interface/executor@1",
+      "calls": [
+        {"via": "interface/executor@1", "method": "invoke"}
+      ],
       "accepts": [
         "text/x-bash"
       ]

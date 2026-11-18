@@ -77,14 +77,22 @@ def catalog(root):
                 if set(spec) != {"implementation"} or implemented[2] != "executor":
                     raise ValueError(f"invalid external executor: {key}.{name}")
                 continue
-            if spec.get("implementation") == "delegate":
-                via = reference(spec.get("via"), "interface", module["authority"])
+            if "calls" in spec:
                 accepts = spec.get("accepts")
-                if (set(spec) != {"implementation", "via", "accepts"} or via not in required
-                        or via[2] != "executor" or not isinstance(accepts, list) or not accepts
+                calls = spec["calls"]
+                if (set(spec) != {"calls", "accepts"} or name != "run"
+                        or implemented[2] not in ("bash-runtime", "python-runtime")
+                        or not isinstance(accepts, list) or not accepts
                         or any(not isinstance(fmt, str) or not fmt for fmt in accepts)
-                        or len(set(accepts)) != len(accepts)):
-                    raise ValueError(f"invalid runtime delegate: {key}.{name}")
+                        or len(set(accepts)) != len(accepts)
+                        or not isinstance(calls, list) or len(calls) != 1
+                        or not isinstance(calls[0], dict)
+                        or set(calls[0]) != {"via", "method"}):
+                    raise ValueError(f"invalid runtime calls: {key}.{name}")
+                via = reference(calls[0]["via"], "interface", module["authority"])
+                if (via not in required or via[2] != "executor" or calls[0]["method"] != "invoke"
+                        or calls[0]["method"] not in interfaces[via]["methods"]):
+                    raise ValueError(f"invalid runtime calls: {key}.{name}")
                 continue
             if set(spec) != {"runtime", "artifact", "format", "grant", "args"}:
                 raise ValueError(f"invalid method implementation: {key}.{name}")
@@ -211,7 +219,7 @@ def expand(root=ROOT):
                 raise ValueError(f"unbound method receiver: {name} -> {receiver_name}")
             receiver = instances[receiver_name]
             method = receiver["_module"]["methods"].get(operation["method"])
-            if method is None or method.get("implementation") in ("external", "delegate"):
+            if method is None or method.get("implementation") == "external" or "calls" in method:
                 raise ValueError(f"unknown or non-artifact instance method: {receiver_name}.{operation['method']}")
             interface_key = reference(receiver["_module"]["implements"], "interface",
                                       receiver["_module"]["authority"])
@@ -226,11 +234,14 @@ def expand(root=ROOT):
             runtime = instances[runtime_name]
             if method["format"] not in runtime["_module"]["methods"]["run"]["accepts"]:
                 raise ValueError(f"runtime rejects artifact format: {runtime_name}")
-            executor_iface = reference("interface/executor@1", "interface", runtime["_module"]["authority"])
+            runtime_call = runtime["_module"]["methods"]["run"]["calls"][0]
+            executor_iface = reference(runtime_call["via"], "interface", runtime["_module"]["authority"])
             if executor_iface not in runtime["_bindings"]:
                 raise ValueError(f"runtime lacks executor: {runtime_name}")
             executor_name = runtime["_bindings"][executor_iface]
             executor = instances[executor_name]
+            if runtime_call["method"] not in executor["_module"]["methods"]:
+                raise ValueError(f"unimplemented bound method: {executor_name}.{runtime_call['method']}")
             if (receiver["target"] != instances[name]["target"] or not executor.get("provided", False)
                     or method["grant"] not in executor.get("grants", [])):
                 raise ValueError(f"unauthorized or cross-target invocation: {receiver_name}.{operation['method']}")
@@ -246,7 +257,9 @@ def expand(root=ROOT):
                           "runtime": runtime_name, "format": method["format"],
                           "runtime_values": runtime["_module"].get("values", {}),
                           "executor": executor_name, "target": receiver["target"],
-                          "grant": method["grant"]})
+                          "grant": method["grant"],
+                          "invocation": {"instance": runtime_name, "method": "run", "calls": [
+                              {"instance": executor_name, "method": runtime_call["method"]}]}})
         plan.append({"instance": name, "transition": transition["name"], "calls": calls})
     return plan
 
