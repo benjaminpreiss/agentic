@@ -4,6 +4,7 @@
   "requires": ["interface/os@1", "interface/login-shell@1"],
   "values": {},
   "config": {"account_name": "string"},
+  "methods": {"inspect": {"script": "methods/inspect.sh", "args": ["account_name", "shell_path"]}},
   "uses": [{
     "interface": "interface/login-shell@1",
     "value": "path", "as": "shell_path"

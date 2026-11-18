@@ -141,6 +141,17 @@ def load(root):
         for name, value in declared.items():
             if not isinstance(value, str):
                 raise ValueError(f"invalid provided value: {artifact_ref(mod)}.{name}")
+        handlers = mod.get("methods", {})
+        if not isinstance(handlers, dict) or set(handlers) != set(interfaces[interface].get("methods", {})):
+            raise ValueError(f"incomplete module methods: {artifact_ref(mod)}")
+        for method, handler in handlers.items():
+            if (not isinstance(handler, dict) or set(handler) != {"script", "args"}
+                    or not isinstance(handler["script"], str)
+                    or not re.fullmatch(r"methods/[a-z][a-z0-9-]*\.sh", handler["script"])
+                    or not (root / mod["_file"].parent / handler["script"]).is_file()
+                    or (root / mod["_file"].parent / handler["script"]).is_symlink()
+                    or not isinstance(handler["args"], list)):
+                raise ValueError(f"invalid method implementation: {artifact_ref(mod)}.{method}")
         config, uses = mod.get("config", {}), mod.get("uses", [])
         if (not isinstance(config, dict) or any(not isinstance(k, str) or not ARG.fullmatch(k) or v != "string"
                 for k, v in config.items()) or not isinstance(uses, list)):
@@ -155,6 +166,10 @@ def load(root):
                     or use["as"] in dests):
                 raise ValueError(f"invalid module use: {artifact_ref(mod)}")
             dests.add(use["as"])
+        for method, handler in handlers.items():
+            if (any(not isinstance(arg, str) or arg not in dests for arg in handler["args"])
+                    or len(set(handler["args"])) != len(handler["args"])):
+                raise ValueError(f"invalid method arguments: {artifact_ref(mod)}.{method}")
 
     transitions = documents(root, "transition")
     for key, transition in transitions.items():
@@ -180,6 +195,22 @@ def load(root):
                     or arg["side"] not in ("from", "to") or not isinstance(arg["name"], str)
                     or not ARG.fullmatch(arg["name"]) or transition.get(arg["side"]) is None):
                 raise ValueError(f"invalid transition argument: {artifact_ref(transition)}")
+        calls = transition.get("calls", [])
+        if not isinstance(calls, list):
+            raise ValueError(f"invalid transition method calls: {artifact_ref(transition)}")
+        for call in calls:
+            if (not isinstance(call, dict) or set(call) != {"phase", "side", "via", "method", "params"}
+                    or call["phase"] not in ("before", "after") or call["side"] not in ("from", "to")
+                    or transition.get(call["side"]) is None or not isinstance(call["via"], str)
+                    or not isinstance(call["method"], str) or not ARG.fullmatch(call["method"])
+                    or not isinstance(call["params"], dict)):
+                raise ValueError(f"invalid transition method call: {artifact_ref(transition)}")
+            if call["via"] != "self":
+                reference_id(call["via"], "interface", transition["authority"])
+            for param in call["params"].values():
+                if (not isinstance(param, dict) or (set(param) != {"literal"} and set(param) != {"input"})
+                        or any(not isinstance(value, str) for value in param.values())):
+                    raise ValueError(f"invalid method argument: {artifact_ref(transition)}")
     return interfaces, modules, transitions
 
 
@@ -331,11 +362,44 @@ def expand(root=ROOT, request_file=None):
                 raise ValueError(f"unknown transition argument: {artifact_ref(transition)}.{arg['name']}")
             args.append({"value": endpoint["args"][arg["name"]]["value"], "source":
                         {"side": arg["side"], "detail": endpoint["args"][arg["name"]]["source"]}})
+        calls = []
+        for call in transition.get("calls", []):
+            entries = sources if call["side"] == "from" else desired
+            endpoint = old if call["side"] == "from" else new
+            if call["via"] == "self":
+                provider, provider_interface = name, artifact_id(endpoint["interface"], "interface")
+            else:
+                provider_interface = reference_id(call["via"], "interface", transition["authority"])
+                if provider_interface not in endpoint["bindings"]:
+                    raise ValueError(f"method provider is not bound: {name}.{call['method']}")
+                provider = endpoint["bindings"][provider_interface]
+            resolved = resolve(provider, entries, modules, interfaces)
+            mod = modules[artifact_id(resolved["module"], "module")]
+            if artifact_id(resolved["interface"], "interface") != provider_interface:
+                raise ValueError(f"method provider has wrong interface: {provider}")
+            methods = interfaces[provider_interface].get("methods", {})
+            if call["method"] not in methods or set(call["params"]) != set(methods[call["method"]]["params"]):
+                raise ValueError(f"unknown method or parameters: {name}.{call['method']}")
+            handler = mod["methods"][call["method"]]
+            arguments = [resolved["args"][key]["value"] for key in handler["args"]]
+            for parameter in methods[call["method"]]["params"]:
+                value = call["params"][parameter]
+                if "input" in value:
+                    input_name = value["input"]
+                    if input_name not in endpoint["args"]:
+                        raise ValueError(f"unknown method input: {name}.{input_name}")
+                    arguments.append(endpoint["args"][input_name]["value"])
+                else:
+                    arguments.append(value["literal"])
+            calls.append({"phase": call["phase"], "instance": provider, "method": call["method"],
+                          "script": str(mod["_file"].parent / handler["script"]),
+                          "args": arguments})
         plan.append({"instance": name, "transition": artifact_ref(transition), "interface": interface,
                      "from": artifact_ref(modules[reference_id(before, "module", transition["authority"])]) if before else None,
                      "to": artifact_ref(modules[reference_id(after, "module", transition["authority"])]) if after else None,
                      "dependencies": list((new or old)["bindings"].values()),
-                     "script": str(transition["_file"].parent / "run.sh"), "args": args})
+                     "script": str(transition["_file"].parent / "run.sh"), "args": args,
+                     "calls": calls})
     return plan
 
 
@@ -344,7 +408,17 @@ def script(plan, root=ROOT):
     lines = ["#!/bin/sh", "set -eu",
              "[ \"${AGENTIC_DISPOSABLE_VM:-}\" = true ] && [ \"${AGENTIC_CONSOLE_VERIFIED:-}\" = true ] || { echo 'Disposable VM and console confirmation required' >&2; exit 1; }",
              "[ \"$(id -u)\" -eq 0 ] || { echo 'Run as root on the target' >&2; exit 1; }"]
+    def emit_method(call, marker):
+        content = (root / call["script"]).read_text().rstrip("\n")
+        if marker in content:
+            raise ValueError("method script contains its here-document delimiter")
+        argv = " ".join(shlex.quote(value) for value in call["args"])
+        lines.extend([f"# {call['instance']}.{call['method']}", f"sh -s -- {argv} <<'{marker}'", content, marker])
+
     for number, step in enumerate(plan):
+        for index, call in enumerate(step.get("calls", [])):
+            if call["phase"] == "before":
+                emit_method(call, f"AGENTIC_METHOD_{number}_{index}")
         content = (root / step["script"]).read_text().rstrip("\n")
         marker = f"AGENTIC_TRANSITION_{number}"
         if marker in content:
@@ -353,6 +427,9 @@ def script(plan, root=ROOT):
         transition = step["transition"]
         lines.extend([f"# {step['instance']}: {transition['authority']}/{transition['name']}@{transition['version']}",
                       f"sh -s -- {args} <<'{marker}'", content, marker])
+        for index, call in enumerate(step.get("calls", [])):
+            if call["phase"] == "after":
+                emit_method(call, f"AGENTIC_METHOD_{number}_{index}")
     return "\n".join(lines) + "\n"
 
 

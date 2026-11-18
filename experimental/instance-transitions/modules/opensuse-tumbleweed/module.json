@@ -3,6 +3,7 @@
   "implements": "interface/os@1",
   "requires": [],
   "values": {},
+  "methods": {"inspect_identity": {"script": "methods/inspect-identity.sh", "args": []}},
   "config": {},
   "uses": []
 }

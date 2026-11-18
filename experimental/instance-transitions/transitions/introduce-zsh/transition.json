@@ -4,5 +4,6 @@
   "from": null,
   "to": "module/zsh-on-tumbleweed@1",
   "script": "run.sh",
-  "args": [{"side": "to", "name": "path"}]
+  "args": [{"side": "to", "name": "path"}],
+  "calls": [{"phase": "after", "side": "to", "via": "self", "method": "inspect", "params": {}}]
 }

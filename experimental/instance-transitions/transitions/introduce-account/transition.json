@@ -4,6 +4,7 @@
   "from": null,
   "to": "module/linux-local-account@1",
   "script": "run.sh",
+  "calls": [{"phase": "after", "side": "to", "via": "self", "method": "inspect", "params": {}}],
   "args": [
     {"side": "to", "name": "account_name"},
     {"side": "to", "name": "shell_path"}

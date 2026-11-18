@@ -31,8 +31,11 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(steps[2]['args'][1], {'value': '/usr/bin/zsh', 'source': {'side': 'to',
             'detail': {'interface': ref('interface', 'login-shell'), 'instance': 'interactive', 'value': 'path'}}})
         self.assertEqual(steps[2]['script'], 'transitions/introduce-account/run.sh')
+        self.assertEqual(steps[2]['calls'][0]['args'], ['agentic', '/usr/bin/zsh'])
+        self.assertEqual(steps[2]['calls'][0]['instance'], 'agentic')
         rendered = script(steps)
         self.assertIn("sh -s -- agentic /usr/bin/zsh <<'AGENTIC_TRANSITION_2'", rendered)
+        self.assertIn("sh -s -- agentic /usr/bin/zsh <<'AGENTIC_METHOD_2_0'", rendered)
         self.assertNotIn('ansible', rendered)
         self.assertNotIn('agentic', (ROOT / 'transitions/introduce-account/run.sh').read_text())
         for directory, filename in (('modules', 'module.json'), ('transitions', 'transition.json'),
@@ -89,6 +92,35 @@ class TransitionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'invalid interface method'):
                 load(root)
 
+    def test_transition_invokes_bound_provider_method_before_its_script(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.copy_model(Path(temporary))
+            file = root / 'transitions/introduce-account/transition.json'
+            transition = json.loads(file.read_text())
+            transition['calls'].insert(0, {'phase': 'before', 'side': 'to',
+                'via': local('interface', 'login-shell'), 'method': 'inspect', 'params': {}})
+            file.write_text(json.dumps(transition))
+            steps = expand(root)
+            self.assertEqual(steps[2]['calls'][0]['instance'], 'interactive')
+            self.assertEqual(steps[2]['calls'][0]['args'], ['/usr/bin/zsh'])
+            rendered = script(steps, root)
+            self.assertLess(rendered.index('# interactive.inspect'), rendered.index('# agentic:'))
+            transition['calls'][0]['via'] = local('interface', 'firewall')
+            file.write_text(json.dumps(transition))
+            with self.assertRaisesRegex(ValueError, 'method provider is not bound'):
+                expand(root)
+            transition['calls'][0]['via'] = local('interface', 'login-shell')
+            transition['calls'][0]['params'] = {'unexpected': {'literal': 'x'}}
+            file.write_text(json.dumps(transition))
+            with self.assertRaisesRegex(ValueError, 'unknown method or parameters'):
+                expand(root)
+            module_file = root / 'modules/zsh-on-tumbleweed/module.json'
+            module = json.loads(module_file.read_text())
+            module['methods']['inspect']['script'] = 'methods/../../run.sh'
+            module_file.write_text(json.dumps(module))
+            with self.assertRaisesRegex(ValueError, 'invalid method implementation'):
+                load(root)
+
     def test_two_accounts_share_module_and_provider_under_distinct_instance_ids(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
@@ -107,10 +139,12 @@ class TransitionTests(unittest.TestCase):
             root = self.copy_model(Path(temporary))
             old = root / 'modules/old-zsh'
             old.mkdir()
+            shutil.copytree(root / 'modules/zsh-on-tumbleweed/methods', old / 'methods')
             (old / 'module.json').write_text(json.dumps({
                 **ref('module', 'legacy-zsh', authority='did:web:other.invalid'),
                 'implements': link('interface', 'login-shell'), 'requires': [link('interface', 'os')],
-                'values': {'path': '/old/bin/zsh'}, 'config': {}, 'uses': []}))
+                'values': {'path': '/old/bin/zsh'}, 'config': {}, 'uses': [],
+                'methods': {'inspect': {'script': 'methods/inspect.sh', 'args': ['path']}}}))
             upgrade = root / 'transitions/upgrade-zsh'
             upgrade.mkdir()
             (upgrade / 'run.sh').write_text('#!/bin/sh\nexit 0\n')
@@ -183,6 +217,7 @@ class TransitionTests(unittest.TestCase):
             duplicate = root / 'modules/duplicate'
             duplicate.mkdir()
             shutil.copy(root / 'modules/opensuse-tumbleweed/module.json', duplicate / 'module.json')
+            shutil.copytree(root / 'modules/opensuse-tumbleweed/methods', duplicate / 'methods')
             with self.assertRaisesRegex(ValueError, 'duplicate artifact identity'):
                 expand(root)
             other = json.loads((duplicate / 'module.json').read_text())
