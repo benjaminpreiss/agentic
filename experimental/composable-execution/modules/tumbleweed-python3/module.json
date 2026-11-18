@@ -1,10 +1,11 @@
 {
   "kind": "module",
   "authority": "did:web:agentic.invalid",
-  "name": "python-on-executor",
+  "name": "tumbleweed-python3",
   "version": 1,
   "implements": "interface/python-runtime@1",
   "requires": [
+    "interface/os@1",
     "interface/executor@1",
     "interface/package-manager@1"
   ],

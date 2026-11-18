@@ -1,0 +1,15 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "check-os",
+  "version": 1,
+  "interface": "interface/os@1",
+  "from": null,
+  "to": "module/opensuse-tumbleweed@1",
+  "operations": [
+    {
+      "instance": "host",
+      "method": "inspect_identity"
+    }
+  ]
+}

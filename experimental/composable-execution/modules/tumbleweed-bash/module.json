@@ -1,7 +1,7 @@
 {
   "kind": "module",
   "authority": "did:web:agentic.invalid",
-  "name": "bash-on-executor",
+  "name": "tumbleweed-bash",
   "version": 1,
   "implements": "interface/bash-runtime@1",
   "requires": [

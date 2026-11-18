@@ -6,6 +6,7 @@
     "home": "/home/agentic/work"
   },
   "bindings": {
+    "did:web:agentic.invalid#interface/os@1": "host",
     "did:web:agentic.invalid#interface/bash-runtime@1": "bash-agent"
   }
 }

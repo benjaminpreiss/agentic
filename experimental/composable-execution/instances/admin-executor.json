@@ -5,7 +5,8 @@
   "provided": true,
   "grants": [
     "package-install",
-    "network-read"
+    "network-read",
+    "os-read"
   ],
   "bindings": {}
 }

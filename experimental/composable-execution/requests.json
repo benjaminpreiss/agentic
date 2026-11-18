@@ -9,6 +9,10 @@
       "transition": "did:web:agentic.invalid#transition/bind-bash@1"
     },
     {
+      "instance": "host",
+      "transition": "did:web:agentic.invalid#transition/check-os@1"
+    },
+    {
       "instance": "packages",
       "transition": "did:web:agentic.invalid#transition/bind-zypper@1"
     },

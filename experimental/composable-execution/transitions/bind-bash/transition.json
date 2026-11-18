@@ -5,6 +5,6 @@
   "version": 1,
   "interface": "interface/bash-runtime@1",
   "from": null,
-  "to": "module/bash-on-executor@1",
+  "to": "module/tumbleweed-bash@1",
   "operations": []
 }

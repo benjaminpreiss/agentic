@@ -1,0 +1,8 @@
+{
+  "id": "host",
+  "module": "did:web:agentic.invalid#module/opensuse-tumbleweed@1",
+  "target": "vm",
+  "bindings": {
+    "did:web:agentic.invalid#interface/bash-runtime@1": "bash-admin"
+  }
+}

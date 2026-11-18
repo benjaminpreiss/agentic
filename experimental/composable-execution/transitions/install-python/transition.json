@@ -5,7 +5,7 @@
   "version": 1,
   "interface": "interface/python-runtime@1",
   "from": null,
-  "to": "module/python-on-executor@1",
+  "to": "module/tumbleweed-python3@1",
   "operations": [
     {
       "instance": "packages",

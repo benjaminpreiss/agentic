@@ -23,30 +23,33 @@ class ExecutionGraphTests(unittest.TestCase):
     def test_runtime_and_executor_are_selected_by_instance_bindings(self):
         steps = expand()
         self.assertEqual([step['instance'] for step in steps],
-                         ['bash-admin', 'bash-agent', 'packages', 'python-admin', 'network', 'workspace'])
-        network = steps[4]['calls']
+                         ['bash-admin', 'bash-agent', 'host', 'packages', 'python-admin', 'network', 'workspace'])
+        by_instance = {step['instance']: step for step in steps}
+        self.assertEqual(by_instance['host']['calls'][0]['method'], 'inspect_identity')
+        self.assertEqual(by_instance['host']['calls'][0]['runtime'], 'bash-admin')
+        network = by_instance['network']['calls']
         self.assertEqual([(c['runtime'], c['executor']) for c in network],
                          [('bash-admin', 'admin-executor'), ('python-admin', 'admin-executor')])
         self.assertEqual(network[1]['args'], ['192.0.2.10/24'])
-        self.assertEqual(steps[5]['calls'][0]['executor'], 'agent-executor')
-        self.assertEqual(steps[3]['calls'][0]['receiver'], 'packages')
-        self.assertEqual(steps[3]['calls'][0]['method'], 'install')
-        self.assertEqual(steps[3]['calls'][0]['args'], ['python3'])
+        self.assertEqual(by_instance['workspace']['calls'][0]['executor'], 'agent-executor')
+        self.assertEqual(by_instance['python-admin']['calls'][0]['receiver'], 'packages')
+        self.assertEqual(by_instance['python-admin']['calls'][0]['method'], 'install')
+        self.assertEqual(by_instance['python-admin']['calls'][0]['args'], ['python3'])
         self.assertEqual(network[0]['runtime_values'], {'path': '/usr/bin/bash'})
         self.assertEqual(network[1]['runtime_values'], {'path': '/usr/bin/python3'})
         self.assertNotIn('executable', network[0])
         self.assertNotIn('python3', (ROOT / 'modules/tumbleweed-zypper/methods/install.sh').read_text())
-        self.assertNotIn('script', steps[4])
+        self.assertNotIn('script', by_instance['network'])
 
     def test_runtime_module_values_flow_through_the_bound_runtime(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.copy(Path(tmp))
-            self.change(root, 'modules/python-on-executor/module.json',
+            self.change(root, 'modules/tumbleweed-python3/module.json',
                         lambda doc: doc['values'].update(path='/opt/runtime/python'))
             network = next(step for step in expand(root) if step['instance'] == 'network')['calls']
             self.assertEqual(network[1]['runtime_values'], {'path': '/opt/runtime/python'})
             self.assertEqual(network[0]['runtime_values'], {'path': '/usr/bin/bash'})
-            self.change(root, 'modules/python-on-executor/module.json',
+            self.change(root, 'modules/tumbleweed-python3/module.json',
                         lambda doc: doc['methods']['run'].update(accepts=['text/x-bash']))
             with self.assertRaisesRegex(ValueError, 'runtime rejects artifact format'):
                 expand(root)
@@ -56,13 +59,22 @@ class ExecutionGraphTests(unittest.TestCase):
             root = self.copy(Path(tmp))
             transition = 'transitions/install-python/transition.json'
             self.change(root, transition, lambda doc: doc['operations'][0]['args'].update(package='git'))
-            self.assertEqual(expand(root)[3]['calls'][0]['args'], ['git'])
+            self.assertEqual(next(step for step in expand(root) if step['instance'] == 'python-admin')['calls'][0]['args'], ['git'])
             self.change(root, transition, lambda doc: doc['operations'][0]['args'].pop('package'))
             with self.assertRaisesRegex(ValueError, 'invalid method call arguments'):
                 expand(root)
             self.change(root, transition, lambda doc: doc['operations'][0]['args'].update(package=['python3']))
             with self.assertRaisesRegex(ValueError, 'invalid method call arguments'):
                 expand(root)
+
+    def test_tumbleweed_modules_require_a_bound_os_instance(self):
+        for name in ('packages', 'python-admin', 'network', 'workspace'):
+            with self.subTest(instance=name), tempfile.TemporaryDirectory() as tmp:
+                root = self.copy(Path(tmp))
+                self.change(root, f'instances/{name}.json',
+                            lambda doc: doc['bindings'].pop('did:web:agentic.invalid#interface/os@1'))
+                with self.assertRaisesRegex(ValueError, 'missing or duplicate bindings'):
+                    expand(root)
 
     def test_missing_or_wrong_runtime_and_cross_target_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -93,7 +105,7 @@ class ExecutionGraphTests(unittest.TestCase):
             calls = next(step for step in expand(root) if step['instance'] == 'network')['calls']
             self.assertEqual(calls[0]['executor'], 'agent-executor')
             self.assertEqual(calls[1]['executor'], 'admin-executor')
-            self.change(root, 'modules/bash-on-executor/module.json',
+            self.change(root, 'modules/tumbleweed-bash/module.json',
                         lambda doc: doc['methods']['run'].update(accepts=['text/x-python']))
             with self.assertRaisesRegex(ValueError, 'runtime rejects artifact format'):
                 expand(root)
@@ -133,7 +145,7 @@ class ExecutionGraphTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.copy(Path(tmp))
             # Managed runtimes cannot be cyclic; provided bootstrap executors are unbound.
-            self.change(root, 'modules/bash-on-executor/module.json',
+            self.change(root, 'modules/tumbleweed-bash/module.json',
                         lambda doc: doc['requires'].append('interface/package-manager@1'))
             self.change(root, 'instances/bash-admin.json', lambda doc: doc['bindings'].update({
                 'did:web:agentic.invalid#interface/package-manager@1': 'packages'}))
