@@ -1,0 +1,11 @@
+{
+  "kind":"transition","authority":"did:web:agentic.invalid","name":"stage-networkd","version":1,
+  "interface":"interface/networking@1","from":null,"to":"module/tumbleweed-networkd@1",
+  "script":"run.sh","args":[],
+  "calls":[
+    {"phase":"before","side":"to","via":"interface/os@1","method":"inspect_identity","params":{}},
+    {"phase":"before","side":"to","via":"interface/python-runtime@1","method":"inspect","params":{}},
+    {"phase":"after","side":"to","via":"self","method":"inspect","params":{}},
+    {"phase":"after","side":"to","via":"self","method":"configure","params":{}}
+  ]
+}

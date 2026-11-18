@@ -1,7 +1,12 @@
 #!/bin/sh
 # Stage only. NEVER reload/reconfigure networkd from this method.
 set -eu
-[ "$#" -eq 6 ] || { echo 'expected interface, MAC, mode, CIDR, gateway, DNS list' >&2; exit 2; }
+[ "$#" -eq 7 ] || { echo 'expected interpreter, interface, MAC, mode, CIDR, gateway, DNS list' >&2; exit 2; }
+python_path=$1
+shift
+[ "$python_path" = /usr/bin/python3 ] && [ -x "$python_path" ] || {
+  echo 'Bound Python 3 interpreter unavailable' >&2; exit 1;
+}
 [ "$(id -u)" -eq 0 ] || { echo 'Must run as root' >&2; exit 1; }
 [ "${AGENTIC_DISPOSABLE_VM:-}" = true ] && [ "${AGENTIC_CONSOLE_VERIFIED:-}" = true ] || {
   echo 'Only stage on a disposable VM with verified console access' >&2; exit 1;
@@ -11,8 +16,7 @@ systemctl is-active --quiet systemd-networkd.service || { echo 'systemd-networkd
 for other in NetworkManager.service wicked.service; do
   if systemctl is-active --quiet "$other"; then echo "Competing network manager active: $other" >&2; exit 1; fi
 done
-command -v python3 >/dev/null || { echo 'Python 3 needed for strict network input validation' >&2; exit 1; }
-python3 - "$@" <<'PY'
+"$python_path" - "$@" <<'PY'
 import ipaddress
 import os
 from pathlib import Path

@@ -1,0 +1,6 @@
+{
+  "kind": "interface", "authority": "did:web:agentic.invalid", "name": "python-runtime", "version": 1,
+  "requires": [],
+  "values": {"path": {"guarantee": "Declares a target-side Python 3 interpreter path; an instance method verifies that the installed interpreter works."}},
+  "methods": {"inspect": {"params": [], "guarantee": "Checks the declared target interpreter is executable and reports its Python 3 version at invocation."}}
+}

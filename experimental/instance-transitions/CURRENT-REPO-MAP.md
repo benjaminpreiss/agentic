@@ -1,6 +1,6 @@
 # Mapping the current Agentic NixOS repo to the draft model
 
-This is a **historical inventory of behaviors to replace**, not the proposed interface structure (see [INTERFACE-STRUCTURE.md](INTERFACE-STRUCTURE.md)) and not an executable NixOS plan. It maps the supported deployment at `origin/main` (`f73e8ca`) to proposed interfaces, modules, instances, transitions, and instance methods. The runnable example in this directory remains a **separate Tumbleweed example** with three implemented interfaces and inspection methods, not the full catalog. Nothing here changes `nixos/`, stages a new flake, or validates a VM deployment.
+This is a **historical inventory of behaviors to replace**, not the proposed interface structure (see [INTERFACE-STRUCTURE.md](INTERFACE-STRUCTURE.md)) and not an executable NixOS plan. It maps the supported deployment at `origin/main` (`f73e8ca`) to proposed interfaces, modules, instances, transitions, and instance methods. The runnable examples in this directory cover the original three-interface introduction plus a separate Tumbleweed networkd/Python-dependency example, not the full catalog. Nothing here changes `nixos/`, stages a new flake, or validates a VM deployment.
 
 ## Separate the five roles
 
@@ -39,7 +39,7 @@ These slices are candidates, not a mandate to split each NixOS option or file in
 | GitHub MCP socket | Candidate GitHub-integration **instance methods**, rather than a deployment transition per tool call. | Each request uses an installed capability at execution time. The external API and permissions may change. |
 | Protection audit and report command | Candidate `ProtectionAudit.run` / `readReport` **instance methods**. | A report describes one observation; a timer triggers further invocations. It is not a deployment log. |
 
-The methods above are **design proposals**, not implemented by the current three module packages. The planner supports method dispatch, but none of these operational methods has a Tumbleweed implementation yet. A transition script remains responsible for ordering calls, checking live conditions and reporting partial failure. Runtime method results must not be smuggled into the experiment's pre-target static-value expansion. Configuring an installed timer is deployment work; each later timer firing is not a new transition request.
+The methods above are **design proposals**; backup and GitHub operations have no Tumbleweed implementation yet. The planner supports method dispatch in the small existing examples. A transition script remains responsible for ordering calls, checking live conditions and reporting partial failure. Runtime method results must not be smuggled into the experiment's pre-target static-value expansion. Configuring an installed timer is deployment work; each later timer firing is not a new transition request.
 
 ## First concrete slice to validate next
 

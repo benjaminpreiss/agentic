@@ -52,7 +52,7 @@ class TransitionTests(unittest.TestCase):
     def test_full_interface_catalog_and_dependency_graph(self):
         interfaces, _, _ = load(ROOT)
         self.assertEqual({key[2] for key in interfaces}, {
-            'os', 'package-manager', 'networking', 'firewall', 'ssh-access',
+            'os', 'package-manager', 'python-runtime', 'networking', 'firewall', 'ssh-access',
             'intrusion-prevention', 'mandatory-access-control', 'kernel-hardening',
             'account', 'recovery-access', 'login-shell', 'workspace', 'git-client',
             'sandbox', 'agent-harness', 'skills', 'backup', 'scheduler',
@@ -95,10 +95,32 @@ class TransitionTests(unittest.TestCase):
     def test_networkd_package_exposes_inspection_and_staging_without_an_activation_request(self):
         _, modules, _ = load(ROOT)
         module = modules[artifact_id(ref('module', 'tumbleweed-networkd'), 'module')]
-        self.assertEqual(module['requires'], [local('interface', 'os')])
+        self.assertEqual(module['requires'], [local('interface', 'os'), local('interface', 'python-runtime')])
         self.assertEqual(set(module['methods']), {'inspect', 'configure'})
         self.assertNotIn('networking', {entry['id'] for entry in (
             json.loads(file.read_text()) for file in (ROOT / 'instances').glob('*.json'))})
+        example = ROOT / 'examples/networkd'
+        planned = expand(ROOT, example / 'requests/introduction.json', example / 'instances')
+        self.assertEqual([step['instance'] for step in planned], ['host', 'packages', 'python', 'network'])
+        self.assertEqual(planned[2]['calls'][0]['instance'], 'packages')
+        self.assertEqual(planned[2]['calls'][0]['args'], ['python3'])
+        self.assertEqual([call['instance'] for call in planned[3]['calls']],
+                         ['host', 'python', 'network', 'network'])
+        self.assertEqual(planned[3]['calls'][-1]['args'][0], '/usr/bin/python3')
+        self.assertEqual(planned[3]['calls'][-1]['args'][1], 'vm-uplink')
+        rendered = script(planned)
+        self.assertLess(rendered.index('# packages.install'), rendered.index('# python:'))
+        self.assertLess(rendered.index('# python.inspect'), rendered.index('# network.configure'))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.copy_model(Path(temporary))
+            shutil.copytree(example, root / 'examples/networkd')
+            network_file = root / 'examples/networkd/instances/network.json'
+            network = json.loads(network_file.read_text())
+            network['bindings'].pop()
+            network_file.write_text(json.dumps(network))
+            with self.assertRaisesRegex(ValueError, 'missing or unexpected binding'):
+                expand(root, root / 'examples/networkd/requests/introduction.json',
+                       root / 'examples/networkd/instances')
         with tempfile.TemporaryDirectory() as temporary:
             root = self.copy_model(Path(temporary))
             (root / 'modules/tumbleweed-networkd/methods/configure.sh').unlink()

@@ -214,9 +214,9 @@ def load(root):
     return interfaces, modules, transitions
 
 
-def read_desired(root):
+def read_desired(root, instance_dir=None):
     result = {}
-    for file in sorted((root / "instances").glob("*.json")):
+    for file in sorted((instance_dir or root / "instances").glob("*.json")):
         doc = json.loads(file.read_text())
         name = doc.get("id")
         if not isinstance(name, str) or not NAME.fullmatch(name) or file.stem != name or name in result:
@@ -320,12 +320,12 @@ def order(names, entries):
     return ordered
 
 
-def expand(root=ROOT, request_file=None):
+def expand(root=ROOT, request_file=None, instance_dir=None):
     """Resolve explicit transition requests; no execution history or target observation."""
     if request_file is None:
         request_file = root / "requests" / "introduction.json"
     interfaces, modules, transitions = load(root)
-    desired = read_desired(root)
+    desired = read_desired(root, instance_dir)
     requests = read_requests(Path(request_file), transitions)
     if set(desired) != set(requests):
         raise ValueError("requests must explicitly name every desired instance")
@@ -435,9 +435,12 @@ def script(plan, root=ROOT):
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) != 4 or sys.argv[1] != "--requests" or sys.argv[3] not in ("--expand", "--script"):
-            raise ValueError("usage: plan.py --requests requests/introduction.json [--expand | --script]")
-        planned = expand(request_file=Path(sys.argv[2]))
+        if (len(sys.argv) not in (4, 6) or sys.argv[1] != "--requests"
+                or sys.argv[3] not in ("--expand", "--script")
+                or (len(sys.argv) == 6 and sys.argv[4] != "--instances")):
+            raise ValueError("usage: plan.py --requests FILE [--expand | --script] [--instances DIRECTORY]")
+        planned = expand(request_file=Path(sys.argv[2]),
+                         instance_dir=Path(sys.argv[5]) if len(sys.argv) == 6 else None)
         if sys.argv[3] == "--expand":
             print(json.dumps(planned, indent=2))
         else:

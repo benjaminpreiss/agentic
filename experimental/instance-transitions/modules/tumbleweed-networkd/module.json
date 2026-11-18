@@ -1,13 +1,13 @@
 {
   "kind": "module", "authority": "did:web:agentic.invalid", "name": "tumbleweed-networkd", "version": 1,
-  "implements": "interface/networking@1", "requires": ["interface/os@1"], "values": {},
+  "implements": "interface/networking@1", "requires": ["interface/os@1", "interface/python-runtime@1"], "values": {},
   "config": {
     "interface_name": "string", "network_mac": "string", "network_mode": "string",
     "static_ipv4": "string", "gateway_ipv4": "string", "dns_servers": "string"
   },
-  "uses": [],
+  "uses": [{"interface": "interface/python-runtime@1", "value": "path", "as": "python_path"}],
   "methods": {
     "inspect": {"script": "methods/inspect.sh", "args": ["interface_name", "network_mac"]},
-    "configure": {"script": "methods/configure.sh", "args": ["interface_name", "network_mac", "network_mode", "static_ipv4", "gateway_ipv4", "dns_servers"]}
+    "configure": {"script": "methods/configure.sh", "args": ["python_path", "interface_name", "network_mac", "network_mode", "static_ipv4", "gateway_ipv4", "dns_servers"]}
   }
 }
