@@ -122,7 +122,7 @@ class ExecutionGraphTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'runtime rejects artifact format'):
                 expand(root)
 
-    def test_bootstrap_executor_must_be_external_unbound_and_grants_are_well_formed(self):
+    def test_provided_executor_is_interface_only_unbound_with_well_formed_claims(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.copy(Path(tmp))
             self.change(root, 'instances/admin-executor.json',
@@ -130,13 +130,14 @@ class ExecutionGraphTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'invalid executor grant claims'):
                 expand(root)
             shutil.copy(ROOT / 'instances/admin-executor.json', root / 'instances/admin-executor.json')
-            self.change(root, 'modules/external-executor/module.json',
-                        lambda doc: doc['requires'].append('interface/bash-runtime@1'))
             self.change(root, 'instances/admin-executor.json', lambda doc: doc['bindings'].update({
                 'did:web:agentic.invalid#interface/bash-runtime@1': 'bash-admin'}))
-            self.change(root, 'instances/agent-executor.json', lambda doc: doc['bindings'].update({
-                'did:web:agentic.invalid#interface/bash-runtime@1': 'bash-agent'}))
-            with self.assertRaisesRegex(ValueError, 'only unbound bootstrap executors'):
+            with self.assertRaisesRegex(ValueError, 'only unbound interface-only bootstrap executors'):
+                expand(root)
+            shutil.copy(ROOT / 'instances/admin-executor.json', root / 'instances/admin-executor.json')
+            self.change(root, 'instances/admin-executor.json', lambda doc: doc.update(module=
+                        'did:web:agentic.invalid#module/tumbleweed-bash@1'))
+            with self.assertRaisesRegex(ValueError, 'only unbound interface-only bootstrap executors'):
                 expand(root)
 
     def test_method_receiver_must_be_bound_and_artifact_packaged(self):

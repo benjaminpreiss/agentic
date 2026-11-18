@@ -73,10 +73,6 @@ def catalog(root):
         for name, spec in methods.items():
             if not isinstance(spec, dict):
                 raise ValueError(f"invalid method implementation: {key}.{name}")
-            if spec.get("implementation") == "external":
-                if set(spec) != {"implementation"} or implemented[2] != "executor":
-                    raise ValueError(f"invalid external executor: {key}.{name}")
-                continue
             if "calls" in spec:
                 accepts = spec.get("accepts")
                 calls = spec["calls"]
@@ -140,33 +136,44 @@ def expand(root=ROOT):
         name = doc.get("id")
         if not isinstance(name, str) or not NAME.fullmatch(name) or name != file.stem or name in instances:
             raise ValueError(f"invalid instance: {file}")
-        mod_id = reference(doc.get("module"), "module")
-        if (mod_id not in docs["module"] or not isinstance(doc.get("target"), str)
-                or not doc["target"] or type(doc.get("provided", False)) is not bool):
-            raise ValueError(f"unknown module or target: {name}")
-        module = docs["module"][mod_id]
+        if (not isinstance(doc.get("target"), str) or not doc["target"]
+                or type(doc.get("provided", False)) is not bool):
+            raise ValueError(f"invalid instance target or provision: {name}")
+        provided = doc.get("provided", False)
+        if provided:
+            iface = reference(doc.get("interface"), "interface")
+            if ("module" in doc or iface not in docs["interface"] or iface[2] != "executor"
+                    or doc.get("bindings", {}) != {}):
+                raise ValueError(f"only unbound interface-only bootstrap executors can be provided: {name}")
+            module = None
+            expected = set()
+        else:
+            if "interface" in doc:
+                raise ValueError(f"managed instance needs a module, not an interface: {name}")
+            mod_id = reference(doc.get("module"), "module")
+            if mod_id not in docs["module"]:
+                raise ValueError(f"unknown module: {name}")
+            module = docs["module"][mod_id]
+            iface = reference(module["implements"], "interface", module["authority"])
+            expected = {reference(ref, "interface", module["authority"])
+                        for ref in module.get("requires", [])}
         bindings = doc.get("bindings", {})
-        expected = {reference(ref, "interface", module["authority"]) for ref in module.get("requires", [])}
         if not isinstance(bindings, dict):
             raise ValueError(f"invalid bindings: {name}")
         pairs = [(reference(ref, "interface"), provider) for ref, provider in bindings.items()]
         if set(ref for ref, _ in pairs) != expected or len(pairs) != len(expected):
             raise ValueError(f"missing or duplicate bindings: {name}")
         doc["_module"] = module
+        doc["_interface"] = iface
         doc["_bindings"] = dict(pairs)
         instances[name] = doc
     for name, instance in instances.items():
         for iface, provider in instance["_bindings"].items():
             if provider not in instances or instances[provider]["target"] != instance["target"]:
                 raise ValueError(f"unavailable or cross-target provider: {name} -> {provider}")
-            bound = instances[provider]["_module"]
-            if reference(bound["implements"], "interface", bound["authority"]) != iface:
+            if instances[provider]["_interface"] != iface:
                 raise ValueError(f"wrong provider interface: {name} -> {provider}")
         if instance.get("provided", False):
-            if (reference(instance["_module"]["implements"], "interface", instance["_module"]["authority"])
-                    != reference("interface/executor@1", "interface", instance["_module"]["authority"])
-                    or instance["_bindings"]):
-                raise ValueError(f"only unbound bootstrap executors can be provided: {name}")
             grants = instance.get("grants")
             if (not isinstance(grants, list) or any(not isinstance(g, str) or not g for g in grants)
                     or len(grants) != len(set(grants))):
@@ -219,7 +226,7 @@ def expand(root=ROOT):
                 raise ValueError(f"unbound method receiver: {name} -> {receiver_name}")
             receiver = instances[receiver_name]
             method = receiver["_module"]["methods"].get(operation["method"])
-            if method is None or method.get("implementation") == "external" or "calls" in method:
+            if method is None or "calls" in method:
                 raise ValueError(f"unknown or non-artifact instance method: {receiver_name}.{operation['method']}")
             interface_key = reference(receiver["_module"]["implements"], "interface",
                                       receiver["_module"]["authority"])
@@ -240,8 +247,8 @@ def expand(root=ROOT):
                 raise ValueError(f"runtime lacks executor: {runtime_name}")
             executor_name = runtime["_bindings"][executor_iface]
             executor = instances[executor_name]
-            if runtime_call["method"] not in executor["_module"]["methods"]:
-                raise ValueError(f"unimplemented bound method: {executor_name}.{runtime_call['method']}")
+            if runtime_call["method"] not in docs["interface"][executor["_interface"]]["methods"]:
+                raise ValueError(f"unknown provided executor method: {executor_name}.{runtime_call['method']}")
             if (receiver["target"] != instances[name]["target"] or not executor.get("provided", False)
                     or method["grant"] not in executor.get("grants", [])):
                 raise ValueError(f"unauthorized or cross-target invocation: {receiver_name}.{operation['method']}")
