@@ -1,0 +1,21 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "ssh-access",
+  "version": 1,
+  "requires": [
+    "interface/networking@1",
+    "interface/firewall@1"
+  ],
+  "values": {},
+  "methods": {
+    "configure": {
+      "params": [],
+      "guarantee": "Configures the selected SSH port and authentication policy; does not attest remote reachability."
+    },
+    "inspect": {
+      "params": [],
+      "guarantee": "Observes local SSH configuration and listening status; a transition must test access from outside."
+    }
+  }
+}

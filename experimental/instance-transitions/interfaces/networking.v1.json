@@ -1,0 +1,20 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "networking",
+  "version": 1,
+  "requires": [
+    "interface/os@1"
+  ],
+  "values": {},
+  "methods": {
+    "inspect": {
+      "params": [],
+      "guarantee": "Reports current interface addresses and routes; no lasting reachability guarantee."
+    },
+    "configure": {
+      "params": [],
+      "guarantee": "Stages the selected network settings without activating them; a separate guarded transition must apply the change and verify external access."
+    }
+  }
+}

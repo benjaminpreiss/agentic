@@ -1,0 +1,20 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "workspace",
+  "version": 1,
+  "requires": [
+    "interface/account@1"
+  ],
+  "values": {},
+  "methods": {
+    "prepare": {
+      "params": [],
+      "guarantee": "Creates the configured workspace if necessary and checks owner and permissions now."
+    },
+    "inspect": {
+      "params": [],
+      "guarantee": "Observes workspace ownership and permissions now."
+    }
+  }
+}

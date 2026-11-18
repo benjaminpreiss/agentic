@@ -1,0 +1,17 @@
+{
+  "id": "agentic",
+  "module": "did:web:agentic.invalid#module/linux-local-account@1",
+  "bindings": [
+    {
+      "interface": "did:web:agentic.invalid#interface/os@1",
+      "instance": "host"
+    },
+    {
+      "interface": "did:web:agentic.invalid#interface/login-shell@1",
+      "instance": "interactive"
+    }
+  ],
+  "inputs": {
+    "account_name": "agentic"
+  }
+}

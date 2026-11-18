@@ -1,0 +1,36 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "firewall",
+  "version": 1,
+  "requires": [
+    "interface/networking@1"
+  ],
+  "values": {},
+  "methods": {
+    "ensure_ingress": {
+      "params": [
+        "owner",
+        "protocol",
+        "port"
+      ],
+      "guarantee": "Requests a rule owned by this caller and checks its effective status now; does not promise enduring access."
+    },
+    "inspect_ingress": {
+      "params": [
+        "owner",
+        "protocol",
+        "port"
+      ],
+      "guarantee": "Observes a caller-owned ingress rule now."
+    },
+    "remove_ingress": {
+      "params": [
+        "owner",
+        "protocol",
+        "port"
+      ],
+      "guarantee": "Removes only a caller-owned rule; a transition must check that access is not lost."
+    }
+  }
+}

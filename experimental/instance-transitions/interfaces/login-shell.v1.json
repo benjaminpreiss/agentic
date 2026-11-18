@@ -1,0 +1,21 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "login-shell",
+  "version": 1,
+  "description": "A configured login shell with a statically declared executable path.",
+  "requires": [
+    "interface/os@1"
+  ],
+  "values": {
+    "path": {
+      "guarantee": "The provider declares the executable path before target execution; the transition checks it on the target."
+    }
+  },
+  "methods": {
+    "inspect": {
+      "params": [],
+      "guarantee": "Checks whether the declared shell is executable and registered as a login shell at invocation."
+    }
+  }
+}

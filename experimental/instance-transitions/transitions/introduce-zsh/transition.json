@@ -1,0 +1,25 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "introduce-zsh",
+  "version": 1,
+  "interface": "interface/login-shell@1",
+  "from": null,
+  "to": "module/zsh-on-tumbleweed@1",
+  "script": "run.sh",
+  "args": [
+    {
+      "side": "to",
+      "name": "path"
+    }
+  ],
+  "calls": [
+    {
+      "phase": "after",
+      "side": "to",
+      "via": "self",
+      "method": "inspect",
+      "params": {}
+    }
+  ]
+}

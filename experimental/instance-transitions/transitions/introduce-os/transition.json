@@ -1,0 +1,20 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "introduce-os",
+  "version": 1,
+  "interface": "interface/os@1",
+  "from": null,
+  "to": "module/opensuse-tumbleweed@1",
+  "script": "run.sh",
+  "args": [],
+  "calls": [
+    {
+      "phase": "after",
+      "side": "to",
+      "via": "self",
+      "method": "inspect_identity",
+      "params": {}
+    }
+  ]
+}

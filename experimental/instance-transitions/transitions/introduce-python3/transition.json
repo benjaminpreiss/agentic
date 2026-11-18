@@ -1,0 +1,31 @@
+{
+  "kind": "transition",
+  "authority": "did:web:agentic.invalid",
+  "name": "introduce-python3",
+  "version": 1,
+  "interface": "interface/python-runtime@1",
+  "from": null,
+  "to": "module/tumbleweed-python3@1",
+  "script": "run.sh",
+  "args": [],
+  "calls": [
+    {
+      "phase": "before",
+      "side": "to",
+      "via": "interface/package-manager@1",
+      "method": "install",
+      "params": {
+        "package": {
+          "literal": "python3"
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "side": "to",
+      "via": "self",
+      "method": "inspect",
+      "params": {}
+    }
+  ]
+}

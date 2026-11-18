@@ -1,0 +1,22 @@
+{
+  "id": "network",
+  "module": "did:web:agentic.invalid#module/tumbleweed-networkd@1",
+  "bindings": [
+    {
+      "interface": "did:web:agentic.invalid#interface/os@1",
+      "instance": "host"
+    },
+    {
+      "interface": "did:web:agentic.invalid#interface/python-runtime@1",
+      "instance": "python"
+    }
+  ],
+  "inputs": {
+    "interface_name": "vm-uplink",
+    "network_mac": "00:00:00:00:00:00",
+    "network_mode": "dhcp",
+    "static_ipv4": "",
+    "gateway_ipv4": "",
+    "dns_servers": ""
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "interface",
+  "authority": "did:web:agentic.invalid",
+  "name": "scheduler",
+  "version": 1,
+  "requires": [
+    "interface/os@1"
+  ],
+  "values": {},
+  "methods": {
+    "schedule": {
+      "params": [
+        "owner",
+        "calendar"
+      ],
+      "guarantee": "Installs or updates only the caller-owned scheduled invocation."
+    },
+    "inspect": {
+      "params": [
+        "owner"
+      ],
+      "guarantee": "Reports the scheduled invocation currently registered for that owner."
+    }
+  }
+}

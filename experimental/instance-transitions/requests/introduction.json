@@ -1,0 +1,16 @@
+{
+  "transitions": [
+    {
+      "instance": "host",
+      "transition": "did:web:agentic.invalid#transition/introduce-os@1"
+    },
+    {
+      "instance": "interactive",
+      "transition": "did:web:agentic.invalid#transition/introduce-zsh@1"
+    },
+    {
+      "instance": "agentic",
+      "transition": "did:web:agentic.invalid#transition/introduce-account@1"
+    }
+  ]
+}

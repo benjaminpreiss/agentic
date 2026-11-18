@@ -1,0 +1,11 @@
+{
+  "id": "packages",
+  "module": "did:web:agentic.invalid#module/tumbleweed-zypper@1",
+  "bindings": [
+    {
+      "interface": "did:web:agentic.invalid#interface/os@1",
+      "instance": "host"
+    }
+  ],
+  "inputs": {}
+}

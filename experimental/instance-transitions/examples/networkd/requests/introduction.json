@@ -1,0 +1,20 @@
+{
+  "transitions": [
+    {
+      "instance": "host",
+      "transition": "did:web:agentic.invalid#transition/introduce-os@1"
+    },
+    {
+      "instance": "packages",
+      "transition": "did:web:agentic.invalid#transition/bind-zypper@1"
+    },
+    {
+      "instance": "python",
+      "transition": "did:web:agentic.invalid#transition/introduce-python3@1"
+    },
+    {
+      "instance": "network",
+      "transition": "did:web:agentic.invalid#transition/stage-networkd@1"
+    }
+  ]
+}
